@@ -38,6 +38,8 @@ drf-yasg==1.21.10
 Faker==37.4.2
 fonttools==4.59.1
 frozenlist==1.7.0
+git-filter-repo==2.47.0
+gunicorn==23.0.0
 holidays==0.79
 honcho==2.0.0
 idna==3.10
