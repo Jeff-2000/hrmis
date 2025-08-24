@@ -487,13 +487,6 @@ class ContractViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['employee__first_name','employee__last_name']
 
-
-    # def get_queryset(self):
-    #     qs = super().get_queryset()
-    #     emp_id = self.request.query_params.get('employee')
-    #     if emp_id: qs = qs.filter(employee_id=emp_id)
-    #     return qs
-
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user

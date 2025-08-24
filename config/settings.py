@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from decouple import config
+import dj_database_url
 
 
 ENVIRONMENT = config("ENVIRONMENT", default="development")
@@ -193,6 +194,12 @@ DATABASES = {
     }
 }
 
+POSTGRESS_LOCALLY = False
+
+if ENVIRONMENT == 'production' or not POSTGRESS_LOCALLY:
+    DATABASES['default'] = dj_database_url.config(
+        default=config('RENDER_EXTERNAL_DATABASE_URL')
+    )
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

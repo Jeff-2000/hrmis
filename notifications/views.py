@@ -74,5 +74,7 @@ class NotificationPreferenceViewSet(ModelViewSet):
         serializer.save(user=self.request.user)
 
 def notification_center_view(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
     return render(request, 'notifications/notification_center.html')
 

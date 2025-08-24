@@ -7,7 +7,7 @@ from .serializers import SituationSerializer
 from rest_framework.permissions import IsAuthenticated
 from employee.permissions import IsAdminOrHR, IsOwnProfile
 from .permissions import CanEditDeleteOwnSituation
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 # situation/views.py
 from rest_framework import viewsets, status
@@ -240,12 +240,18 @@ class SituationViewSet(viewsets.ModelViewSet):
 
 # Simple views for the pages
 def situation_current(request):
+    if not request.user.is_authenticated:
+        return redirect('public_home')
     return render(request, 'situation/current.html')
 
 def situation_history(request):
+    if not request.user.is_authenticated:
+        return redirect('public_home')
     return render(request, 'situation/history.html')
 
 def my_situation(request):
+    if not request.user.is_authenticated:
+        return redirect('public_home')
     return render(request, 'situation/my_situation.html')
 
 
