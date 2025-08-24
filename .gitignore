@@ -28,8 +28,8 @@ db.sqlite3-journal
 # Static & Media
 /staticfiles/
 /media/
-/theme/static/
-/static/
+# /theme/static/
+# /static/
 
 # Media (user uploads)
 media/
