@@ -1,0 +1,464 @@
+
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="slide-in">
+    <h1 class="text-2xl font-bold text-orange-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-layer-group text-green-600"></i> Gestion des Grades
+    </h1>
+    
+    <div class="dashboard-grid grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-orange-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-orange-500 text-white rounded-full p-3">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Grades</h3>
+                    <div class="stat-number text-2xl font-bold text-orange-600" id="totalGrades">0</div>
+                    <div class="stat-label text-gray-600">Niveaux hiérarchiques</div>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-green-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-green-500 text-white rounded-full p-3">
+                    <i class="fas fa-user-tie"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Employés</h3>
+                    <div class="stat-number text-2xl font-bold text-green-600" id="totalEmployees">0</div>
+                    <div class="stat-label text-gray-600">Répartis par grade</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="search-bar mb-6 flex items-center gap-2">
+        <i class="fas fa-search text-gray-600"></i>
+        <input type="text" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" id="gradeSearch" placeholder="Rechercher un grade..." onkeyup="searchGrades()">
+    </div>
+    
+    <div class="table-container bg-white shadow-xl rounded-lg border-l-4 border-orange-600">
+        <div class="table-header flex justify-between items-center p-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list mr-2"></i> Structure des Grades</h3>
+            <a href="{% url 'grade_create' %}" class="btn bg-green-500 hover:bg-green-600 text-white">
+                <i class="fas fa-plus mr-2"></i> Ajouter
+            </a>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-3 px-4 text-left text-gray-800">Code</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Description</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Nombre d'Employés</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="gradesTable"></tbody>
+        </table>
+        <div id="pagination" class="flex justify-between items-center p-4">
+            <div>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" onclick="changePage(-1)" disabled>Précédent</button>
+                <span id="pageInfo" class="text-gray-600"></span>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage" onclick="changePage(1)">Suivant</button>
+            </div>
+            <select id="pageSize" onchange="updatePageSize()" class="select select-bordered border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPage = 1;
+    let pageSize = 10;
+    let searchQuery = '';
+
+    function getGradeColorClass(code) {
+        switch (code) {
+            case "A1": return "bg-orange-500";
+            case "A2": return "bg-orange-400";
+            case "A3": return "bg-orange-300";
+            case "A4": return "bg-orange-200";
+            case "A5": return "bg-orange-100";
+            case "A6": return "bg-orange-50";
+            case "B1": return "bg-blue-500";
+            case "B2": return "bg-blue-400";
+            case "B3": return "bg-blue-300";
+            case "B4": return "bg-blue-200";
+            case "B5": return "bg-blue-100";
+            case "B6": return "bg-blue-50";
+            case "C1": return "bg-green-500";
+            case "C2": return "bg-green-400";
+            case "C3": return "bg-green-300";
+            case "C4": return "bg-green-200";
+            case "C5": return "bg-green-100";
+            case "C6": return "bg-green-50";
+            case "D1": return "bg-purple-500";
+            case "D2": return "bg-purple-400";
+            case "D3": return "bg-purple-300";
+            case "D4": return "bg-purple-200";
+            case "D5": return "bg-purple-100";
+            case "D6": return "bg-purple-50";
+            case "E1": return "bg-red-500";
+            case "E2": return "bg-red-400";
+            case "E3": return "bg-red-300";
+            case "E4": return "bg-red-200";
+            case "E5": return "bg-red-100";
+            case "E6": return "bg-red-50";
+            default:   return "bg-gray-500";
+        }
+    }
+
+    // Toast notification
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1">
+                <p class="text-sm font-medium">${message}</p>
+            </div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    // Custom ShowMessage for dialogs
+    function ShowMessage({ title, message, type = 'info', buttons = [], onClose = null }) {
+        const modal = document.createElement('dialog');
+        modal.className = 'modal';
+        const colors = {
+            info: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-600', icon: 'fa-info-circle text-orange-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' },
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            confirm: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-600', icon: 'fa-question-circle text-yellow-600' }
+        };
+        const { bg, text, border, icon } = colors[type] || colors.info;
+        modal.innerHTML = `
+            <div class="modal-box ${bg} ${text} border-l-4 ${border} p-6">
+                <div class="flex items-start">
+                    <i class="fas ${icon} mt-1 mr-3 text-2xl"></i>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold mb-2">${title}</h2>
+                        <p class="text-sm">${message}</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    ${buttons.map(btn => `
+                        <button class="btn ${btn.className || 'btn-ghost text-gray-600 hover:bg-gray-200'}" onclick="${btn.onclick}">
+                            ${btn.label}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.showModal();
+        modal.addEventListener('close', () => {
+            modal.remove();
+            if (onClose) onClose();
+        });
+        return modal;
+    }
+
+    function closeModal() {
+        const modal = document.querySelector('.modal');
+        if (modal) modal.close();
+    }
+
+    // Get CSRF token from cookie
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function searchGrades() {
+        searchQuery = document.getElementById('gradeSearch').value;
+        currentPage = 1;
+        loadGrades();
+    }
+
+    function updatePageSize() {
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadGrades();
+    }
+
+    function changePage(delta) {
+        currentPage += delta;
+        loadGrades();
+    }
+
+    async function loadGrades() {
+        try {
+            const url = `/api/v1/employees/grades/?page=${currentPage}&page_size=${pageSize}&search=${encodeURIComponent(searchQuery)}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const nonJsonText = await response.text();
+                throw new Error(`Format de réponse invalide: JSON attendu, reçu ${contentType}. Réponse: ${nonJsonText}`);
+            }
+
+            const data = await response.json();
+            const tbody = document.getElementById('gradesTable');
+            tbody.innerHTML = data.results.map(grade => `
+                <tr class="hover:bg-orange-50 border-b border-gray-200">
+                    <td class="py-3 px-4"><span class="badge ${getGradeColorClass(grade.code)} text-white">${grade.code}</span></td>
+                    <td class="py-3 px-4">${grade.description || 'N/A'}</td>
+                    <td class="py-3 px-4">${grade.employee_count || 0}</td>
+                    <td class="py-3 px-4">
+                        <div class="flex gap-2">
+                            <button class="btn btn-sm btn-ghost text-orange-600 hover:bg-orange-100" onclick="viewGrade('${grade.id}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                            <button class="btn btn-sm bg-orange-500 hover:bg-orange-600 text-white" onclick="editGrade('${grade.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm bg-red-500 hover:bg-red-600 text-white" onclick="confirmDelete('${grade.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" class="py-3 px-4 text-center text-gray-500">Aucun grade trouvé.</td></tr>';
+
+            document.getElementById('totalGrades').textContent = data.count;
+            document.getElementById('totalEmployees').textContent = data.total_employees || 0;
+
+            const totalPages = Math.ceil(data.count / pageSize);
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage === totalPages;
+        } catch (error) {
+            console.error('Error loading grades:', error);
+            showToast(`Erreur lors du chargement des grades: ${error.message}`, 'error');
+        }
+    }
+
+    async function viewGrade(id) {
+        try {
+            const response = await fetch(`/api/v1/employees/grades/view/${id}/`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                const responseText = await response.text();
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                throw new Error(`Erreur API (${response.status}): ${responseText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const responseText = await response.text();
+                throw new Error(`Format de réponse invalide: JSON attendu, reçu ${contentType}. Réponse: ${responseText}`);
+            }
+            const grade = await response.json();
+            ShowMessage({
+                title: 'Détails du Grade',
+                message: `
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800"><span class="badge ${getGradeColorClass(grade.code)} text-white">${grade.code}</span></h3>
+                        <p><strong>Description:</strong> ${grade.description || 'N/A'}</p>
+                        <p><strong>Nombre d'Employés:</strong> ${grade.employee_count || 0}</p>
+                    </div>
+                `,
+                type: 'info',
+                buttons: [
+                    {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                    { label: 'Modifier', className: 'bg-orange-500 hover:bg-orange-600 text-white', onclick: `closeModal();editGrade('${grade.id}')` },
+                    { label: 'Supprimer', className: 'bg-red-500 hover:bg-red-600 text-white', onclick: `closeModal();confirmDelete('${grade.id}')` },
+                    {% endif %}
+                    { label: 'Fermer', className: 'btn-ghost text-gray-600 hover:bg-gray-100', onclick: 'closeModal()' }
+                ]
+            });
+        } catch (error) {
+            console.error('Error viewing grade:', error);
+            showToast(`Erreur lors du chargement des détails: ${error.message}`, 'error');
+        }
+    }
+
+
+    async function editGrade(id) {
+        try {
+            const response = await fetch(`/api/v1/employees/grades/view/${id}/`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                const responseText = await response.text();
+                throw new Error(`Erreur API (${response.status}): ${responseText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const responseText = await response.text();
+                throw new Error(`Format de réponse invalide: JSON attendu, reçu ${contentType}. Réponse: ${responseText}`);
+            }
+            const grade = await response.json();
+            ShowMessage({
+                title: 'Modifier le Grade',
+                message: `
+                    <form id="editGradeForm" class="grid grid-cols-1 gap-4">
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Code du Grade</span></label>
+                            <input type="text" name="code" value="${grade.code}" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" required>
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Description</span></label>
+                            <input type="text" name="description" value="${grade.description || ''}" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+                        </div>
+                    </form>
+                `,
+                type: 'info',
+                buttons: [
+                    { label: 'Enregistrer', className: 'bg-green-500 hover:bg-green-600 text-white', onclick: `submitEditGrade('${grade.id}')` },
+                    { label: 'Annuler', className: 'btn-ghost text-gray-600 hover:bg-gray-100', onclick: 'closeModal()' }
+                ]
+            });
+        } catch (error) {
+            console.error('Error loading grade for edit:', error);
+            showToast(`Erreur lors du chargement du grade: ${error.message}`, 'error');
+        }
+    }
+
+
+    async function submitEditGrade(id) {
+        const form = document.getElementById('editGradeForm');
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { data[key] = value || null; });
+
+        try {
+            const response = await fetch(`/api/v1/employees/grades/edit/${id}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                const errorText = await response.text();
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                if (response.status === 403) {
+                    showToast('Permission refusée', 'error');
+                    return;
+                }
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const nonJsonText = await response.text();
+                throw new Error(`Format de réponse invalide: JSON attendu, reçu ${contentType}. Réponse: ${nonJsonText}`);
+            }
+            const responseData = await response.json();
+            closeModal();
+            showToast('Grade mis à jour avec succès!', 'success');
+            loadGrades();
+        } catch (error) {
+            console.error('Error updating grade:', error);
+            showToast(`Erreur lors de la mise à jour du grade: ${error.message}`, 'error');
+        }
+    }
+
+    async function confirmDelete(id) {
+        ShowMessage({
+            title: 'Confirmer la Suppression',
+            message: 'Êtes-vous sûr de vouloir supprimer ce grade ? Cette action est irréversible.',
+            type: 'confirm',
+            buttons: [
+                { label: 'Supprimer', className: 'bg-red-500 hover:bg-red-600 text-white', onclick: `deleteGrade('${id}')` },
+                { label: 'Annuler', className: 'btn-ghost text-gray-600 hover:bg-gray-100', onclick: 'closeModal()' }
+            ]
+        });
+    }
+
+    async function deleteGrade(id) {
+        try {
+            const response = await fetch(`/api/v1/employees/grades/delete/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                if (response.status === 403) {
+                    showToast('Permission refusée', 'error');
+                    return;
+                }
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            closeModal();
+            showToast('Grade supprimé avec succès!', 'success');
+            loadGrades();
+        } catch (error) {
+            console.error('Error deleting grade:', error);
+            showToast(`Erreur lors de la suppression du grade: ${error.message}`, 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadGrades);
+</script>
+{% endblock %}

@@ -1,0 +1,245 @@
+{% extends 'main/base.html' %}
+{% block title %}Paie — Variables mensuelles{% endblock %}
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-sliders"></i> Variables mensuelles
+        </h1>
+        <div class="join">
+          <label class="btn join-item bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
+            <i class="fas fa-file-import mr-2"></i> Import CSV
+            <input type="file" id="csvInput" class="hidden" accept=".csv">
+          </label>
+          <a id="btnExport" class="btn join-item bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
+            <i class="fas fa-file-export mr-2"></i> Export CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- Filters / run picker -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+        <div>
+          <label class="label"><span class="label-text">Lot (run)</span></label>
+          <select id="runSelect" class="select select-bordered w-full bg-blue-100 text-blue-800"></select>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Employé (ID)</span></label>
+          <input id="empFilter" class="input input-bordered w-full bg-blue-50" placeholder="Filtrer par ID">
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Composant</span></label>
+          <select id="compSelect" class="select select-bordered w-full bg-blue-100 text-blue-800">
+            <option value="">— Tous —</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button id="btnAdd" class="btn bg-green-600 hover:bg-green-700 text-white"><i class="fas fa-plus mr-2"></i> Ajouter</button>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="overflow-x-auto mt-4 bg-gray-50 rounded-box">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap text-blue-600">Run</th>
+              <th class="whitespace-nowrap text-blue-600">Employé</th>
+              <th class="whitespace-nowrap text-blue-600">Composant</th>
+              <th class="whitespace-nowrap text-blue-600">Qté</th>
+              <th class="whitespace-nowrap text-blue-600">Tarif</th>
+              <th class="whitespace-nowrap text-blue-600">Montant</th>
+              <th class="whitespace-nowrap text-blue-600">Note</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="varsTbody"><tr><td colspan="8" class="text-center">Sélectionnez un lot…</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="mt-3 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create/Edit mini modal -->
+<input type="checkbox" id="varModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg mb-2" id="varModalTitle">Nouvelle variable</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label class="label"><span class="label-text">Employé (ID)</span></label>
+        <input id="v_emp" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Composant</span></label>
+        <select id="v_comp" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Quantité</span></label>
+        <input id="v_qty" type="number" step="0.001" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" value="1">
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Tarif</span></label>
+        <input id="v_rate" type="number" step="0.0001" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" value="0">
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Montant</span></label>
+        <input id="v_amt" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" value="0">
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Note</span></label>
+        <input id="v_note" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+      </div>
+    </div>
+    <div class="modal-action">
+      <label for="varModal" class="btn btn-ghost">Annuler</label>
+      <button id="v_save" class="btn bg-orange-600 hover:bg-orange-700 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const state = { page:1, size:10, run:null, editId:null };
+  const tbody = document.getElementById('varsTbody');
+
+  async function loadRuns(){
+    const r = await fetch('/api/v1/runs/?page_size=100', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const data = await r.json();
+    const rows = data.results || data || [];
+    const sel = document.getElementById('runSelect');
+    sel.innerHTML = `<option value="">— Choisir —</option>` + rows.map(x=>`<option value="${x.id}">${String(x.month).padStart(2,'0')}/${x.year} — ${x.company_policy?.name||''}</option>`).join('');
+  }
+  async function loadComponents(){
+    const r = await fetch('/api/v1/components/?page_size=200', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const data = await r.json();
+    const rows = data.results || data || [];
+    document.getElementById('compSelect').innerHTML = `<option value="">— Tous —</option>` + rows.map(c=>`<option value="${c.id}">${c.code} — ${c.name}</option>`).join('');
+    document.getElementById('v_comp').innerHTML = rows.map(c=>`<option value="${c.id}">${c.code} — ${c.name}</option>`).join('');
+  }
+
+  async function loadVars(){
+    if (!state.run){ tbody.innerHTML = `<tr><td colspan="8" class="text-center">Sélectionnez un lot…</td></tr>`; return; }
+    const params = new URLSearchParams();
+    params.set('page', state.page); params.set('page_size', state.size); params.set('run', state.run);
+    const comp = document.getElementById('compSelect').value;
+    const emp  = document.getElementById('empFilter').value.trim();
+    if (comp) params.set('component', comp);
+    if (emp)  params.set('employee', emp);
+
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center">Chargement…</td></tr>`;
+    const r = await fetch(`/api/v1/variables/?${params.toString()}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const data = await r.json();
+    const rows = data.results || data || [];
+    if (!rows.length){ tbody.innerHTML = `<tr><td colspan="8" class="text-center text-base-gray">Aucune donnée</td></tr>`; }
+    else {
+      tbody.innerHTML = rows.map(v=>`<tr>
+        <td>${v.run || ''}</td>
+        <td>${v.employee?.id}</td>
+        <td>${v.component?.code}</td>
+        <td>${v.quantity}</td>
+        <td>${v.rate}</td>
+        <td>${v.amount}</td>
+        <td>${v.note || ''}</td>
+        <td class="text-right">
+          <button class="btn btn-xs bg-yellow-100 text-yellow-800 hover:bg-yellow-200" data-edit="${v.id}"><i class="fas fa-pen"></i></button>
+          <button class="btn btn-xs bg-red-100 text-red-800 hover:bg-red-200" data-del="${v.id}"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`).join('');
+      tbody.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> openEdit(b.dataset.edit)));
+      tbody.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=> delVar(b.dataset.del)));
+    }
+    document.getElementById('pageInfo').textContent = data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`;
+  }
+
+  async function openEdit(id){
+    state.editId = id;
+    const r = await fetch(`/api/v1/variables/${id}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const v = await r.json();
+    document.getElementById('varModalTitle').textContent = 'Modifier la variable';
+    document.getElementById('v_emp').value = v.employee?.id || '';
+    document.getElementById('v_comp').value = v.component?.id || '';
+    document.getElementById('v_qty').value = v.quantity || 1;
+    document.getElementById('v_rate').value = v.rate || 0;
+    document.getElementById('v_amt').value = v.amount || 0;
+    document.getElementById('v_note').value = v.note || '';
+    document.getElementById('varModal').checked = true;
+  }
+
+  document.getElementById('v_save').addEventListener('click', async ()=>{
+    const payload = {
+      run_id: state.run,
+      employee_id: document.getElementById('v_emp').value,
+      component_id: document.getElementById('v_comp').value,
+      quantity: document.getElementById('v_qty').value,
+      rate: document.getElementById('v_rate').value,
+      amount: document.getElementById('v_amt').value,
+      note: document.getElementById('v_note').value
+    };
+    const url = state.editId ? `/api/v1/variables/${state.editId}/` : `/api/v1/variables/`;
+    const method = state.editId ? 'PATCH' : 'POST';
+    const r = await fetch(url, { method, headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify(payload) });
+    if (!r.ok){ alert('Erreur'); return; }
+    document.getElementById('varModal').checked = false;
+    state.editId = null; loadVars();
+  });
+
+  async function delVar(id){
+    if (!confirm('Supprimer cette ligne ?')) return;
+    const r = await fetch(`/api/v1/variables/${id}/`, { method:'DELETE', headers:{'X-Requested-With':'XMLHttpRequest'} });
+    if (!r.ok){ alert('Erreur suppression'); return; }
+    loadVars();
+  }
+
+  // Import/Export
+  document.getElementById('csvInput').addEventListener('change', async (e)=>{
+    const f = e.target.files[0]; if (!f || !state.run){ alert('Choisissez un lot d’abord.'); return; }
+    const fd = new FormData(); fd.append('file', f);
+    const r = await fetch('/api/v1/variables/import_csv/', { method:'POST', body: fd, headers:{'X-Requested-With':'XMLHttpRequest'} });
+    if (!r.ok){ alert('Import échoué'); return; }
+    await r.json(); loadVars();
+  });
+  document.getElementById('btnExport').addEventListener('click', ()=>{
+    if (!state.run){ alert('Choisissez un lot'); return; }
+    const emp = document.getElementById('empFilter').value.trim();
+    const comp = document.getElementById('compSelect').value;
+    const p = new URLSearchParams({ run:state.run }); if(emp) p.set('employee',emp); if(comp) p.set('component',comp);
+    window.open(`/api/v1/variables/export_csv/?${p.toString()}`, '_blank');
+  });
+
+  // Wiring
+  document.getElementById('runSelect').addEventListener('change', (e)=>{ state.run = e.target.value || null; state.page=1; loadVars(); });
+  document.getElementById('compSelect').addEventListener('change', ()=> loadVars());
+  document.getElementById('empFilter').addEventListener('input', ()=>{ clearTimeout(window._deb); window._deb=setTimeout(loadVars, 300); });
+  document.getElementById('btnAdd').addEventListener('click', ()=>{
+    if (!state.run){ alert('Choisissez un lot'); return; }
+    state.editId = null;
+    document.getElementById('varModalTitle').textContent = 'Nouvelle variable';
+    document.getElementById('v_emp').value = '';
+    document.getElementById('v_comp').value = '';
+    document.getElementById('v_qty').value = '1';
+    document.getElementById('v_rate').value = '0';
+    document.getElementById('v_amt').value = '0';
+    document.getElementById('v_note').value = '';
+    document.getElementById('varModal').checked = true;
+  });
+
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){ state.page--; loadVars(); } });
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadVars(); });
+
+  // init
+  loadRuns(); loadComponents();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,233 @@
+{% extends 'main/base.html' %}
+{% block title %}Paramètres Paie — Devises & Taux{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2"><i class="fas fa-coins"></i> Devises & Taux de Change</h1>
+
+      <div class="tabs tabs-lifted mt-4">
+        <a id="tabCur" class="tab tab-active !text-black bg-blue-100 hover:bg-blue-200">Devises</a>
+        <a id="tabRates" class="tab !text-black hover:bg-blue-100 hover:text-blue-900">Taux</a>
+      </div>
+
+      <!-- Currencies -->
+      <div id="paneCur" class="pt-4">
+        <div class="flex justify-between">
+          <div></div>
+          <button id="btnNewCur" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Nouvelle Devise</button>
+        </div>
+        <div class="overflow-x-auto mt-3">
+          <table class="table w-full">
+            <thead>
+                <tr>
+                    <th class="whitespace-nowrap text-blue-600">Code</th>
+                    <th class="whitespace-nowrap text-blue-600">Nom</th>
+                    <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="curTbody"><tr><td colspan="3" class="text-center text-gray">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Rates -->
+      <div id="paneRates" class="hidden pt-4">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div>
+            <label class="label"><span class="label-text">Base</span></label>
+            <select id="r_base" class="select select-bordered select-sm w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+          </div>
+          <div>
+            <label class="label"><span class="label-text">Quote</span></label>
+            <select id="r_quote" class="select select-bordered select-sm w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+          </div>
+          <div>
+            <label class="label"><span class="label-text">Date</span></label>
+            <input id="r_date" type="date" class="input input-bordered input-sm w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+          </div>
+          <div class="md:col-span-2 text-right">
+            <button id="btnNewRate" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Nouveau Taux</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto mt-3">
+          <table class="table w-full">
+            <thead>
+                <tr>
+                    <th class="whitespace-nowrap text-blue-600">Base</th>
+                    <th class="whitespace-nowrap text-blue-600">Quote</th>
+                    <th class="whitespace-nowrap text-blue-600">Date</th>
+                    <th class="whitespace-nowrap text-blue-600">Taux</th>
+                    <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="rateTbody"><tr><td colspan="5" class="text-center text-gray">Sélectionnez base & quote</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals -->
+<input type="checkbox" id="curModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg" id="curTitle">Nouvelle Devise</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div><label class="label"><span class="label-text">Code (ISO3)</span></label><input id="c_code" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="XOF"></div>
+      <div><label class="label"><span class="label-text">Nom</span></label><input id="c_name" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="Franc CFA BCEAO"></div>
+    </div>
+    <div class="modal-action">
+      <label for="curModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnSaveCur" class="btn bg-orange-600 hover:bg-orange-700 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<input type="checkbox" id="rateModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg" id="rateTitle">Nouveau Taux</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div><label class="label"><span class="label-text ">Base</span></label><select id="f_base" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select></div>
+      <div><label class="label"><span class="label-text">Quote</span></label><select id="f_quote" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select></div>
+      <div><label class="label"><span class="label-text">Date</span></label><input id="f_date" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+      <div><label class="label"><span class="label-text">Taux</span></label><input id="f_rate" type="number" step="0.00000001" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+    </div>
+    <div class="modal-action">
+      <label for="rateModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnSaveRate" class="btn bg-orange-600 hover:bg-orange-700 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  function getCsrf(){ const m=document.cookie.match(/csrftoken=([^;]+)/); return m?m[1]:''; }
+  let curEdit=null, rateEdit=null, currencies=[];
+
+  /*
+  function switchTab(t){
+    paneCur.classList.toggle('hidden', t!=='cur'); tabCur.classList.toggle('tab-active', t==='cur');
+    paneRates.classList.toggle('hidden', t!=='rates'); tabRates.classList.toggle('tab-active', t==='rates');
+  }
+  */
+function switchTab(t){
+  // Currencies tab
+  const activeCur = t === 'cur';
+  paneCur.classList.toggle('hidden', !activeCur);
+  tabCur.classList.toggle('tab-active', activeCur);
+  tabCur.classList.toggle('bg-blue-100', activeCur);
+  tabCur.classList.toggle('text-blue-800', activeCur);
+  tabCur.classList.toggle('bg-transparent', !activeCur);
+  tabCur.classList.toggle('text-black', !activeCur);
+
+  // Rates tab
+  const activeRates = t === 'rates';
+  paneRates.classList.toggle('hidden', !activeRates);
+  tabRates.classList.toggle('tab-active', activeRates);
+  tabRates.classList.toggle('bg-blue-100', activeRates);
+  tabRates.classList.toggle('text-blue-800', activeRates);
+  tabRates.classList.toggle('bg-transparent', !activeRates);
+  tabRates.classList.toggle('text-black', !activeRates);
+}
+  tabCur.addEventListener('click',()=>switchTab('cur')); tabRates.addEventListener('click',()=>switchTab('rates'));
+
+  async function loadCurrencies(){
+    const r=await fetch('/api/v1/currencies/?page_size=999'); const d=await r.json(); currencies=d.results||d||[];
+    curTbody.innerHTML = currencies.length ? currencies.map(c=>`<tr>
+      <td>${c.code}</td><td>${c.name}</td>
+      <td class="text-right">
+        <button class="btn btn-xs btn-warning" data-edit="${c.code}">Modifier</button>
+        <button class="btn btn-xs btn-error text-white" data-del="${c.code}">Supprimer</button>
+      </td>
+    </tr>`).join('') : `<tr><td colspan="3" class="text-center text-base-content/60">Aucune devise</td></tr>`;
+    r_base.innerHTML = currencies.map(c=>`<option value="${c.code}">${c.code}</option>`).join('');
+    r_quote.innerHTML= currencies.map(c=>`<option value="${c.code}">${c.code}</option>`).join('');
+    f_base.innerHTML = r_base.innerHTML; f_quote.innerHTML=r_quote.innerHTML;
+
+    curTbody.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openCur(b.dataset.edit)));
+    curTbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>delCur(b.dataset.del)));
+  }
+
+  function openCur(code){
+    curEdit=code||null; curTitle.textContent = code?'Modifier Devise':'Nouvelle Devise';
+    c_code.disabled=!!code; c_code.value=''; c_name.value='';
+    if(code){ const x=currencies.find(c=>c.code===code); c_code.value=x.code; c_name.value=x.name; }
+    curModal.checked=true;
+  }
+  async function saveCur(){
+    const payload={code:c_code.value.trim().toUpperCase(), name:c_name.value.trim()};
+    if(!payload.code || !payload.name){ showToast('Code et nom requis','error'); return; }
+    const url = curEdit? `/api/v1/currencies/${payload.code}/` : '/api/v1/currencies/';
+    const method = curEdit? 'PUT':'POST';
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},body:JSON.stringify(payload)});
+    if(!r.ok){ const e=await r.json().catch(()=>({detail:'Erreur'})); showToast(e.detail||JSON.stringify(e),'error'); return; }
+    curModal.checked=false; showToast('Enregistré','success'); loadCurrencies();
+  }
+  async function delCur(code){
+    if(!confirm('Supprimer cette devise ?')) return;
+    const r=await fetch(`/api/v1/currencies/${code}/`,{method:'DELETE',headers:{'X-CSRFToken':getCsrf()}});
+    if(!r.ok){ showToast('Suppression impossible','error'); return; }
+    showToast('Supprimé','success'); loadCurrencies();
+  }
+
+  async function loadRates(){
+    const base=r_base.value, quote=r_quote.value;
+    if(!base || !quote || base===quote){ rateTbody.innerHTML=`<tr><td colspan="5" class="text-center text-gray">Sélectionnez deux devises différentes</td></tr>`; return; }
+    const params=new URLSearchParams(); params.set('base',base); params.set('quote',quote); params.set('page_size',999);
+    const r=await fetch('/api/v1/exchange-rates/?'+params.toString()); const d=await r.json(); const rows=d.results||d||[];
+    rateTbody.innerHTML = rows.length ? rows.map(x=>`<tr>
+      <td>${x.base?.code}</td><td>${x.quote?.code}</td><td>${x.date}</td><td>${x.rate}</td>
+      <td class="text-right">
+        <button class="btn btn-warning" data-edit="${x.id}">Modifier</button>
+        <button class="btn btn-xs btn-error text-white" data-del="${x.id}">Supprimer</button>
+      </td>
+    </tr>`).join('') : `<tr><td colspan="5" class="text-center text-gray">Aucun taux</td></tr>`;
+    rateTbody.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openRate(b.dataset.edit)));
+    rateTbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>delRate(b.dataset.del)));
+  }
+
+  function openRate(id){
+    rateEdit=id||null; rateTitle.textContent=id?'Modifier Taux':'Nouveau Taux';
+    f_base.value=r_base.value||''; f_quote.value=r_quote.value||''; f_date.value=r_date.value||''; f_rate.value='';
+    if(id){
+      fetch('/api/v1/exchange-rates/'+id+'/').then(r=>r.json()).then(x=>{
+        f_base.value=x.base?.code||''; f_quote.value=x.quote?.code||''; f_date.value=x.date||''; f_rate.value=x.rate||'';
+        rateModal.checked=true;
+      });
+    } else rateModal.checked=true;
+  }
+  async function saveRate(){
+    const payload={ base_id:f_base.value, quote_id:f_quote.value, date:f_date.value, rate: Number(f_rate.value||0) };
+    if(!payload.base_id || !payload.quote_id || !payload.date || !payload.rate){ showToast('Base, quote, date et taux requis','error'); return; }
+    const url = rateEdit? `/api/v1/exchange-rates/${rateEdit}/` : '/api/v1/exchange-rates/';
+    const method = rateEdit? 'PUT':'POST';
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},body:JSON.stringify(payload)});
+    if(!r.ok){ const e=await r.json().catch(()=>({detail:'Erreur'})); showToast(e.detail||JSON.stringify(e),'error'); return; }
+    rateModal.checked=false; showToast('Enregistré','success'); loadRates();
+  }
+  async function delRate(id){
+    if(!confirm('Supprimer ce taux ?')) return;
+    const r=await fetch(`/api/v1/exchange-rates/${id}/`,{method:'DELETE',headers:{'X-CSRFToken':getCsrf()}});
+    if(!r.ok){ showToast('Suppression impossible','error'); return; }
+    showToast('Supprimé','success'); loadRates();
+  }
+
+  // wiring
+  btnNewCur.addEventListener('click',()=>openCur(null));
+  btnSaveCur.addEventListener('click',saveCur);
+  r_base.addEventListener('change',loadRates); r_quote.addEventListener('change',loadRates);
+  r_date.addEventListener('change',()=>{}); // date only used as default for create
+  btnNewRate.addEventListener('click',()=>openRate(null));
+  btnSaveRate.addEventListener('click',saveRate);
+
+  loadCurrencies().then(loadRates);
+})();
+</script>
+{% endblock %}

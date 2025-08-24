@@ -1,0 +1,218 @@
+{# templates/dashboard/index.html #}
+{% extends 'main/base.html' %}
+{% load static %}
+{% block title %}Tableau de bord — HRMIS{% endblock %}
+
+{% block content %}
+<style>
+  /* Ensure canvas elements have a fixed height and don't grow excessively */
+  #chartLeave, #chartDept {
+    max-height: 300px; /* Adjust this value as needed */
+    width: 100%;
+    height: 100% !important; /* Override any Chart.js default height */
+  }
+  /* Ensure parent container doesn't stretch unnecessarily */
+  .card-body {
+    overflow: hidden; /* Prevent overflow from affecting layout */
+  }
+</style>
+
+<div class="container mx-auto px-4 py-6 slide-in">
+  <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-6">
+    <i class="fas fa-chart-line text-blue-600"></i> Tableau de Bord <span class="text-red-500"> DESCRIPTIF </span>
+  </h1>
+
+  <!-- KPI cards -->
+  <div id="kpiCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Filled by JS -->
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Charts -->
+    <div class="lg:col-span-2 card bg-white shadow-xl border-l-4 border-blue-600">
+      <div class="card-body">
+        <h2 class="text-lg font-semibold text-blue-700 mb-2">Tendance des congés (12 derniers mois)</h2>
+        <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+          <canvas id="chartLeave"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-white shadow-xl border-l-4 border-emerald-600">
+      <div class="card-body">
+        <h2 class="text-lg font-semibold text-emerald-700 mb-2">Effectif par direction (Top 8)</h2>
+        <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+          <canvas id="chartDept"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent items -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+    <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+      <div class="card-body">
+        <h2 class="text-lg font-semibold text-orange-700">Notifications récentes</h2>
+        <ul id="recentNotifications" class="mt-3 space-y-2 text-blue-900"></ul>
+        <div class="text-right mt-3">
+          <a href="{% url 'notification_center' %}" class="btn btn-sm bg-blue-100 hover:bg-blue-200 text-blue-800">Centre de notifications</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-white shadow-xl border-l-4 border-purple-600">
+      <div class="card-body">
+        <h2 class="text-lg font-semibold text-purple-700">Congés récents</h2>
+        <ul id="recentLeaves" class="mt-3 space-y-2 text-blue-900"></ul>
+        <div class="text-right mt-3">
+          <a href="/api/v1/leave/my_leave/" class="btn btn-sm bg-purple-100 hover:bg-purple-200 text-purple-800">Voir les congés</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-white shadow-xl border-l-4 border-gray-600">
+      <div class="card-body">
+        <h2 class="text-lg font-semibold text-gray-700">Anniversaires du mois</h2>
+        <ul id="recentBirthdays" class="mt-3 space-y-2 text-blue-900"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payroll / My payslips (if available) -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6" id="payrollSection" style="display:none;">
+    <div class="card bg-white shadow-xl border-l-4 border-teal-600">
+      <div class="card-body">
+        <h2 class="text-lg font-semibold text-teal-700">Dernier cycle de paie</h2>
+        <div id="latestRunBox" class="mt-2 text-blue-900"></div>
+      </div>
+    </div>
+    <div class="card bg-white shadow-xl border-l-4 border-teal-600">
+      <div class="card-body">
+        <h2 class="text-lg font-semibold text-teal-700">Mes bulletins récents</h2>
+        <ul id="myPayslips" class="mt-2 space-y-2 text-blue-900"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
+
+{% block extra_js %}
+<!-- Chart.js via CDN with a specific version (UMD build for browser compatibility) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  // Verify Chart.js is loaded
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js failed to load. Please check the CDN URL or network connectivity.');
+    return;
+  }
+
+  const els = {
+    kpis: document.getElementById('kpiCards'),
+    chartLeave: document.getElementById('chartLeave'),
+    chartDept: document.getElementById('chartDept'),
+    recentNotifications: document.getElementById('recentNotifications'),
+    recentLeaves: document.getElementById('recentLeaves'),
+    recentBirthdays: document.getElementById('recentBirthdays'),
+    payrollSection: document.getElementById('payrollSection'),
+    latestRunBox: document.getElementById('latestRunBox'),
+    myPayslips: document.getElementById('myPayslips'),
+  };
+
+  function kpiCard(icon, label, value, color){
+    return `
+      <div class="card bg-white shadow-xl border-l-4 ${color}">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <div class="text-3xl"><i class="${icon}"></i></div>
+            <div class="text-2xl font-bold text-blue-900">${value.toLocaleString('fr-FR')}</div>
+          </div>
+          <div class="mt-2 text-blue-700">${label}</div>
+        </div>
+      </div>`;
+  }
+
+  function liItem(primary, secondary, classes=""){
+    return `<li class="p-2 rounded bg-gray-50 border ${classes}"><div class="font-semibold">${primary}</div><div class="text-sm opacity-80">${secondary}</div></li>`;
+  }
+
+  function truncate(s, n){ if(!s) return ''; return s.length>n ? s.slice(0,n-1)+'…' : s; }
+
+  async function load(){
+    const r = await fetch('api/summary/', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!r.ok){ console.error('Dashboard API error', r.status); return; }
+    const data = await r.json();
+
+    // KPIs
+    const K = data.kpis || {};
+    const L = data.leave || {};
+    els.kpis.innerHTML = [
+      kpiCard('fas fa-users text-blue-600', 'Effectif total', K.headcount_total||0, 'border-blue-600'),
+      kpiCard('fas fa-user-check text-emerald-600', 'Actifs', K.headcount_active||0, 'border-emerald-600'),
+      kpiCard('fas fa-file-signature text-orange-600', 'Contrats expirant (30j)', K.contracts_expiring_30d||0, 'border-orange-600'),
+      kpiCard('fas fa-bell text-red-600', 'Notifications non lues', K.unread_notifications||0, 'border-red-600'),
+    ].join('');
+
+    // Charts
+    const leaveLabels = (L.trend && L.trend.labels) || [];
+    const leaveValues = (L.trend && L.trend.values) || [];
+    new Chart(els.chartLeave.getContext('2d'), {
+      type: 'line',
+      data: { labels: leaveLabels, datasets: [{ label: 'Congés approuvés', data: leaveValues }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const H = (data.headcount && data.headcount.by_department) || {labels:[], values:[]};
+    new Chart(els.chartDept.getContext('2d'), {
+      type: 'bar',
+      data: { labels: H.labels, datasets: [{ label: 'Effectif', data: H.values }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // Recents
+    const RN = data.recent && data.recent.notifications || [];
+    els.recentNotifications.innerHTML = RN.length ? RN.map(n => {
+      const badge = n.is_read ? '' : '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Nouveau</span>';
+      const date = new Date(n.timestamp).toLocaleString('fr-FR');
+      return liItem(
+        `${truncate(n.title||'Notification', 60)} ${badge}`,
+        truncate(n.message, 120) + ` <span class="block text-xs">${date}</span>`
+      );
+    }).join('') : '<li class="text-gray-500">Aucune notification récente.</li>';
+
+    const RL = data.recent && data.recent.leaves || [];
+    els.recentLeaves.innerHTML = RL.length ? RL.map(l => {
+      const s = (l.status || '').replaceAll('_',' ');
+      return liItem(`${l.employee} — ${l.type}`, `${l.start} → ${l.end} • ${s}`);
+    }).join('') : '<li class="text-gray-500">Aucun congé récent.</li>';
+
+    const RB = data.recent && data.recent.birthdays_this_month || [];
+    els.recentBirthdays.innerHTML = RB.length ? RB.map(b => {
+      const date = b.date_of_birth ? new Date(b.date_of_birth).toLocaleDateString('fr-FR') : '';
+      return liItem(`${b.first_name} ${b.last_name}`, `Né(e) le ${date}`);
+    }).join('') : '<li class="text-gray-500">Aucun anniversaire ce mois.</li>';
+
+    // Payroll (optional)
+    if (data.payroll && data.payroll.has_run) {
+      els.payrollSection.style.display = 'grid';
+      const run = data.payroll.latest_run;
+      els.latestRunBox.innerHTML = run
+        ? `<div class="text-blue-900">
+            <div><span class="font-semibold">Période:</span> ${String(run.month).padStart(2,'0')}/${run.year}</div>
+            <div><span class="font-semibold">Statut:</span> ${run.status}</div>
+          </div>`
+        : '<div class="text-gray-500">Aucun cycle de paie trouvé.</div>';
+
+      const my = data.payroll.my_payslips || [];
+      els.myPayslips.innerHTML = my.length ? my.map(p => {
+        return liItem(`Période ${p.period}`, `Net: ${p.net_pay} • ${p.finalized ? 'Finalisé' : 'Brouillon'}`);
+      }).join('') : '<li class="text-gray-500">Aucun bulletin récent.</li>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+})();
+</script>
+{% endblock %}

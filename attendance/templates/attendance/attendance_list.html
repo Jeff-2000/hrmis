@@ -1,0 +1,626 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-list text-blue-600"></i> Liste des Présences
+    </h1>
+
+    <!-- Filters -->
+    <div class="filters grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Plage de Dates</span></label>
+            <input type="text" id="dateRange" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" placeholder="Sélectionner les dates" />
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Employé</span></label>
+            <select id="employeeFilter" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="">Tous les employés</option>
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Département</span></label>
+            <select id="departmentFilter" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="">Tous les départements</option>
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Statut</span></label>
+            <select id="statusFilter" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="">Tous les statuts</option>
+                <option value="present">Présent</option>
+                <option value="absent">Absent</option>
+                <option value="leave">Congé</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+        <div class="table-header flex justify-between items-center p-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list mr-2"></i> Enregistrements de Présence</h3>
+            {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+            <a href="{% url 'attendance_create' %}" class="btn bg-green-500 hover:bg-green-600 text-white">
+                <i class="fas fa-plus mr-2"></i> Ajouter
+            </a>
+            {% endif %}
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-3 px-4 text-left text-gray-800">Employé</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Date</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Heure d'Arrivée</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Heure de Départ</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Statut</th>
+                    {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                    <th class="py-3 px-4 text-left text-gray-800">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody id="attendanceTable"></tbody>
+        </table>
+        <div id="pagination" class="flex justify-between items-center p-4">
+            <div>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" onclick="if (typeof changePage === 'function') changePage(-1); else console.error('changePage is undefined');" disabled>Précédent</button>
+                <span id="pageInfo" class="text-gray-600"></span>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage" onclick="if (typeof changePage === 'function') changePage(1); else console.error('changePage is undefined');">Suivant</button>
+            </div>
+            <select id="pageSize" onchange="if (typeof updatePageSize === 'function') updatePageSize(); else console.error('updatePageSize is undefined');" class="select select-bordered border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.9/dist/flatpickr.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.9/dist/flatpickr.min.css">
+<script>
+    let currentPage = 1;
+    let pageSize = 10;
+    let filters = { date_range: '', employee_id: '', department_id: '', status: '' };
+
+    function safeGet(obj, path, defaultValue = '') {
+        try {
+            return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : defaultValue, obj);
+        } catch (e) {
+            return defaultValue;
+        }
+    }
+    
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        }
+        return null;
+    }
+
+    function showToast(message, type = 'error') {
+        console.log(`Showing toast: ${message}, type: ${type}`); // Debug log
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1"><p class="text-sm font-medium">${message}</p></div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.parentElement.classList.add('hide')">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    // Initialize date picker
+    flatpickr('#dateRange', {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        onChange: function(selectedDates) {
+            if (selectedDates.length === 2) {
+                filters.date_range = `${selectedDates[0].toISOString().split('T')[0]} to ${selectedDates[1].toISOString().split('T')[0]}`;
+                currentPage = 1;
+                loadAttendance();
+            }
+        }
+    });
+
+    const showActions = {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}true{% else %}false{% endif %};
+
+    // Load employees and departments for filters
+    async function loadFilters() {
+        try {
+            const empResponse = await fetch('/api/v1/employees/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!empResponse.ok) throw new Error('Erreur lors du chargement des employés');
+            const empData = await empResponse.json();
+            const empSelect = document.getElementById('employeeFilter');
+            empData.results.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.id;
+                option.textContent = `${emp.first_name} ${emp.last_name}`;
+                empSelect.appendChild(option);
+            });
+
+            const deptResponse = await fetch('/api/v1/employees/departments/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!deptResponse.ok) throw new Error('Erreur lors du chargement des départements');
+            const deptData = await deptResponse.json();
+            const deptSelect = document.getElementById('departmentFilter');
+            deptData.results.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept.id;
+                option.textContent = dept.name;
+                deptSelect.appendChild(option);
+            });
+
+            empSelect.addEventListener('change', () => {
+                filters.employee_id = empSelect.value;
+                currentPage = 1;
+                loadAttendance();
+            });
+            deptSelect.addEventListener('change', () => {
+                filters.department_id = deptSelect.value;
+                currentPage = 1;
+                loadAttendance();
+            });
+            document.getElementById('statusFilter').addEventListener('change', () => {
+                filters.status = document.getElementById('statusFilter').value;
+                currentPage = 1;
+                loadAttendance();
+            });
+        } catch (error) {
+            console.error('Error loading filters:', error);
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+
+    function escapeHtml(string) {
+        if (typeof string !== 'string') return '';
+        return string
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    async function loadAttendance() {
+        console.log('Loading attendance records'); // Debug log
+        const tbody = document.getElementById('attendanceTable');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
+
+        try {
+            const query = new URLSearchParams({
+                page: currentPage,
+                page_size: pageSize,
+                date_range: filters.date_range || '',
+                employee_id: filters.employee_id || '',
+                department_id: filters.department_id || '',
+                status: filters.status || ''
+            }).toString();
+
+            const response = await fetch(`/api/v1/attendance/?${query}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                let errorText;
+                try {
+                    errorText = await response.text();
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.error || errorData.message || `HTTP Error ${response.status}`);
+                } catch (e) {
+                    throw new Error(errorText || `HTTP Error ${response.status}`);
+                }
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}...`);
+            }
+
+            let data;
+            try {
+                data = await response.json();
+            } catch (error) {
+                throw new Error(`Invalid JSON format: ${error.message}`);
+            }
+
+            // --- DEBUG PRINT ---
+            console.log('Attendance API result:', data);
+
+            // Support both paginated and plain array responses
+            let records;
+            if (Array.isArray(data.results)) {
+                records = data.results;
+            } else if (Array.isArray(data)) {
+                records = data;
+            } else {
+                throw new Error('API response does not contain results array.');
+            }
+
+            // Handle no records
+            if (!records.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-3 px-4 text-center text-gray-500">Aucun enregistrement trouvé.</td></tr>';
+                document.getElementById('pageInfo').textContent = 'Page 1 sur 1';
+                document.getElementById('prevPage').disabled = true;
+                document.getElementById('nextPage').disabled = true;
+                return;
+            }
+
+            tbody.innerHTML = records.map(record => {
+                // DEBUG each record
+                if (!record.id) console.warn("Record has no id:", record);
+
+                const employeeName = `${safeGet(record, 'employee.first_name', '')} ${safeGet(record, 'employee.last_name', '')}`.trim() || 'Unknown';
+                const date = formatDateForDisplay(safeGet(record, 'date'));
+                const checkIn = formatTimeForDisplay(safeGet(record, 'check_in'));
+                const checkOut = formatTimeForDisplay(safeGet(record, 'check_out'));
+                const status = safeGet(record, 'status', 'absent');
+                const recordId = safeGet(record, 'id', ''); // Should be defined
+
+                // Actions buttons: only if recordId is present!
+                let actions = '';
+                if (showActions && recordId) {
+                    actions = `
+                    <td class="py-3 px-4">
+                        <div class="flex gap-2">
+                            <button class="btn btn-sm bg-blue-400 hover:bg-blue-500 text-white" title="Voir" onclick="viewRecord('${recordId}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white" title="Modifier" onclick="editRecord('${recordId}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm bg-red-500 hover:bg-red-600 text-white" title="Supprimer" onclick="confirmDelete('${recordId}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                    `;
+                } else if (showActions) {
+                    // If there's no ID, don't generate broken buttons
+                    actions = `<td class="py-3 px-4 text-red-500">ID absent</td>`;
+                }
+
+                return `
+                    <tr class="hover:bg-blue-50 border-b border-gray-200">
+                        <td class="py-3 px-4">${escapeHtml(employeeName)}</td>
+                        <td class="py-3 px-4">${escapeHtml(date)}</td>
+                        <td class="py-3 px-4">${escapeHtml(checkIn)}</td>
+                        <td class="py-3 px-4">${escapeHtml(checkOut)}</td>
+                        <td class="py-3 px-4">
+                            <span class="badge ${
+                                status === 'present' ? 'bg-green-500' :
+                                status === 'absent' ? 'bg-red-500' :
+                                status === 'leave' ? 'bg-yellow-500' :
+                                'bg-gray-500'
+                            } text-white">
+                                ${
+                                    status === 'present' ? 'Présent' :
+                                    status === 'absent' ? 'Absent' :
+                                    status === 'leave' ? 'Congé' :
+                                    status
+                                }
+                            </span>
+                        </td>
+                        ${actions}
+                    </tr>
+                `;
+            }).join('');
+
+            // Pagination info
+            const count = data.count !== undefined ? data.count : records.length;
+            const totalPages = Math.max(1, Math.ceil(count / pageSize));
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+
+        } catch (error) {
+            console.error('Full error details:', {
+                error: error.message,
+                stack: error.stack
+            });
+            tbody.innerHTML = `<tr><td colspan="6" class="text-red-500 py-4 text-center">
+                Erreur de chargement: ${escapeHtml(error.message)}
+            </td></tr>`;
+            showToast(`Erreur lors du chargement des présences: ${error.message}`, 'error');
+        }
+    }
+
+    function updatePageSize() {
+        console.log('Updating page size'); // Debug log
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadAttendance();
+    }
+
+    function changePage(delta) {
+        console.log(`Changing page by ${delta}`); // Debug log
+        currentPage += delta;
+        loadAttendance();
+    }
+
+    async function viewRecord(id) {
+        if (!id) {
+            showToast('ID de l\'enregistrement manquant', 'error');
+            return;
+        }
+        try {
+            console.log(`Fetching record with ID: ${id}`); // Debug log
+            const response = await fetch(`/api/v1/attendance/view/${id}/`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            const r = await response.json();
+            openModal(`
+                <div class="mb-4 flex items-center gap-3">
+                    <i class="fas fa-user text-2xl text-blue-500"></i>
+                    <span class="font-bold text-lg text-gray-800">${escapeHtml(safeGet(r, 'employee.first_name'))} ${escapeHtml(safeGet(r, 'employee.last_name'))}</span>
+                </div>
+                <div class="grid grid-cols-1 gap-3">
+                    <div><span class="font-semibold text-gray-600">Date:</span> ${formatDateForDisplay(r.date)}</div>
+                    <div><span class="font-semibold text-gray-600">Heure d'Arrivée:</span> ${formatTimeForDisplay(r.check_in)}</div>
+                    <div><span class="font-semibold text-gray-600">Heure de Départ:</span> ${formatTimeForDisplay(r.check_out)}</div>
+                    <div>
+                        <span class="font-semibold text-gray-600">Statut:</span>
+                        <span class="badge ${
+                            r.status === 'present' ? 'bg-green-500' :
+                            r.status === 'absent' ? 'bg-red-500' :
+                            r.status === 'leave' ? 'bg-yellow-500' :
+                            'bg-gray-500'
+                        } text-white px-2 ml-2">
+                            ${r.status === 'present' ? 'Présent' :
+                            r.status === 'absent' ? 'Absent' :
+                            r.status === 'leave' ? 'Congé' :
+                            r.status}
+                        </span>
+
+                    </div>
+                </div>
+                <div class="flex justify-end mt-6">
+                    <button class="btn bg-blue-500 hover:bg-blue-600 text-white" onclick="document.querySelector('.daisy-modal').remove()">Fermer</button>
+                </div>
+            `);
+        } catch (error) {
+            console.error('Error loading record:', error);
+            showToast(`Erreur lors du chargement: ${error.message}`, 'error');
+        }
+    }
+
+    async function editRecord(id) {
+        if (!id) {
+            showToast('ID d\'enregistrement manquant', 'error');
+            return;
+        }
+        try {
+            console.log(`Fetching record for edit with ID: ${id}`); // Debug log
+            const response = await fetch(`/api/v1/attendance/edit/${id}/`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            const record = await response.json();
+            const employeeResponse = await fetch('/api/v1/employees/', {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                credentials: 'same-origin'
+            });
+            if (!employeeResponse.ok) {
+                const errorText = await employeeResponse.text();
+                throw new Error(`Erreur lors du chargement des employés: ${errorText}`);
+            }
+            const employees = (await employeeResponse.json()).results;
+            openModal(`
+                <form id="editAttendanceForm" class="grid grid-cols-1 gap-4">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Employé</span></label>
+                        <select name="employee_id" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                            <option value="" disabled>Sélectionner</option>
+                            ${employees.map(emp => `
+                                <option value="${emp.id}" ${emp.id === record.employee.id ? 'selected' : ''}>
+                                    ${escapeHtml(emp.first_name)} ${escapeHtml(emp.last_name)}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Date</span></label>
+                        <input type="date" name="date" value="${record.date}" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Heure d'Arrivée</span></label>
+                        <input type="time" name="check_in" value="${record.check_in || ''}" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Heure de Départ</span></label>
+                        <input type="time" name="check_out" value="${record.check_out || ''}" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Statut</span></label>
+                        <select name="status" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                            <option value="present" ${record.status === 'present' ? 'selected' : ''}>Présent</option>
+                            <option value="absent" ${record.status === 'absent' ? 'selected' : ''}>Absent</option>
+                            <option value="leave" ${record.status === 'leave' ? 'selected' : ''}>Congé</option>
+                        </select>
+                    </div>
+                </form>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button class="btn bg-green-500 hover:bg-green-600 text-white" onclick="submitEditRecord('${record.id}')">Enregistrer</button>
+                    <button class="btn btn-ghost text-gray-600 hover:bg-gray-100" onclick="document.querySelector('.daisy-modal').remove()">Annuler</button>
+                </div>
+            `);
+        } catch (error) {
+            console.error('Error loading record:', error);
+            showToast(`Erreur lors du chargement de l'enregistrement: ${error.message}`, 'error');
+        }
+    }
+
+    async function submitEditRecord(id) {
+        if (!id) {
+            showToast('ID d\'enregistrement manquant', 'error');
+            return;
+        }
+        const form = document.getElementById('editAttendanceForm');
+        if (!form) {
+            showToast('Formulaire non trouvé', 'error');
+            return;
+        }
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { data[key] = value || null; });
+
+        try {
+            console.log(`Submitting edit for record ID: ${id}`); // Debug log
+            const response = await fetch(`/api/v1/attendance/edit/${id}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            document.querySelector('.daisy-modal').remove();
+            showToast('Enregistrement mis à jour avec succès!', 'success');
+            loadAttendance();
+        } catch (error) {
+            console.error('Error updating record:', error);
+            showToast(`Erreur lors de la mise à jour: ${error.message}`, 'error');
+        }
+    }
+
+    function confirmDelete(id) {
+        console.log(`Opening delete confirmation for ID: ${id}`); // Debug log
+        openModal(`
+            <div class="flex flex-col items-center p-2">
+                <div class="mb-3 text-red-600 text-3xl"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="font-semibold text-lg mb-1 text-gray-800">Confirmer la Suppression</div>
+                <div class="text-gray-600 mb-4">Êtes-vous sûr de vouloir supprimer cet enregistrement ? Cette action est <b>irréversible</b>.</div>
+                <div class="flex gap-2 justify-end w-full">
+                    <button class="btn bg-red-500 hover:bg-red-600 text-white" onclick="deleteRecord('${id}')">Supprimer</button>
+                    <button class="btn btn-ghost text-gray-600 hover:bg-gray-200" onclick="document.querySelector('.daisy-modal').remove()">Annuler</button>
+                </div>
+            </div>
+        `);
+    }
+
+    async function deleteRecord(id) {
+        if (!id) {
+            showToast('ID d\'enregistrement manquant', 'error');
+            return;
+        }
+        try {
+            console.log(`Deleting record with ID: ${id}`); // Debug log
+            const response = await fetch(`/api/v1/attendance/delete/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            document.querySelector('.daisy-modal').remove();
+            showToast('Enregistrement supprimé avec succès!', 'success');
+            loadAttendance();
+        } catch (error) {
+            console.error('Error deleting record:', error);
+            showToast(`Erreur lors de la suppression: ${error.message}`, 'error');
+        }
+    }
+
+    function openModal(html, options={}) {
+        console.log('Opening modal'); // Debug log
+        document.querySelectorAll('.daisy-modal').forEach(m => m.remove());
+        const modal = document.createElement('div');
+        modal.className = "daisy-modal fixed inset-0 flex items-center justify-center z-50 bg-black/40";
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg shadow-2xl max-w-lg w-full p-6 relative animate-fade-in">
+                <button class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl" onclick="this.closest('.daisy-modal').remove()"><i class="fas fa-times"></i></button>
+                ${html}
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => {
+            const focusable = modal.querySelector("button, input, select, [tabindex]");
+            if (focusable) focusable.focus();
+        }, 100);
+    }
+
+    function formatDateForDisplay(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d)) return dateStr;
+        return d.toLocaleDateString('fr-FR');
+    }
+
+    function formatTimeForDisplay(timeStr) {
+        if (!timeStr) return '';
+        if (/^\d{2}:\d{2}/.test(timeStr)) {
+            return timeStr.substring(0, 5);
+        }
+        try {
+            const t = new Date(`1970-01-01T${timeStr}Z`);
+            return t.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        } catch {
+            return timeStr;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, initializing filters and attendance'); // Debug log
+        loadFilters();
+        loadAttendance();
+    });
+</script>
+{% endblock %}
+
+

@@ -1,0 +1,538 @@
+{% extends 'main/base.html' %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet" />
+<style>
+    .fc-event { cursor: pointer; }
+    .fc-daygrid-event { border-radius: 4px; }
+    .fc-event.bg-yellow-500 { background-color: #f59e0b; color: black; }
+    .fc-event.bg-success { background-color: #10b981; color: white; }
+    .fc-event.bg-error { background-color: #ef4444; color: white; }
+    .modal { z-index: 1050; }
+    .modal-box { max-width: 600px; }
+    .toast { animation: slideInRight 0.3s ease-in-out; }
+    .toast.hide { animation: slideOutRight 0.3s ease-in-out; }
+    @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes slideOutRight { from { transform: translateX(0); } to { transform: translateX(100%); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-user-clock text-blue-600"></i> Situation Administrative Actuelle
+    </h1>
+    <div id="calendar" class="min-h-[28rem] bg-gray-100 shadow-xl rounded-lg border-l-4 border-blue-600 p-4"></div>
+
+    <!-- Event Modal -->
+    <input type="checkbox" id="eventModal" class="modal-toggle" />
+    <div class="modal">
+        <div class="modal-box bg-white">
+            <h3 class="font-bold text-lg">Détails de la Situation</h3>
+            <div class="py-4">
+                <p><strong>Employé:</strong> <span id="eventEmployee"></span></p>
+                <p><strong>Type de Situation:</strong> <span id="eventSituationType"></span></p>
+                <p><strong>Date de Début:</strong> <span id="eventStart"></span></p>
+                <p><strong>Date de Fin:</strong> <span id="eventEnd"></span></p>
+                <p><strong>Statut:</strong> <span id="eventStatus"></span></p>
+                <p><strong>Document:</strong> <span id="eventDocument"></span></p>
+                <p><strong>Raison de Disponibilité:</strong> <span id="eventAvailabilityReason"></span></p>
+                <p><strong>Raison d'Exclusion:</strong> <span id="eventExclusionReason"></span></p>
+                <p><strong>Type de Sortie:</strong> <span id="eventExitType"></span></p>
+                <div id="eventActions" class="mt-3"></div>
+            </div>
+            <div class="modal-action">
+                <label for="eventModal" class="btn btn-secondary">Fermer</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <input type="checkbox" id="createEventModal" class="modal-toggle" />
+    <div class="modal">
+        <div class="modal-box bg-white">
+            <h3 class="font-bold text-lg" id="createEventModalLabel">Nouvelle Situation Administrative</h3>
+            <form id="situationCreateForm" enctype="multipart/form-data" class="grid grid-cols-1 gap-4 max-w-lg mx-auto">
+                {% csrf_token %}
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Employé</span></label>
+                    <input type="hidden" name="employee" id="employeeIdInput" value="{{ request.user.employee.id|default:'' }}" />
+                    <input type="text" id="employeeSelectedLabel" class="input input-bordered w-full" value="{{ request.user.employee.get_full_name|default:request.user.username }}" readonly />
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Type de Situation</span></label>
+                    <select name="situation_type_id" id="situationType" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                        <option value="" disabled selected>Sélectionner un type</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Date de Début</span></label>
+                    <input type="date" name="start_date" id="startDate" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Date de Fin</span></label>
+                    <input type="date" name="end_date" id="endDate" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                </div>
+                <div class="form-control" id="documentField">
+                    <label class="label"><span id="documentLabel" class="label-text font-semibold text-gray-800">Justificatif (facultatif)</span></label>
+                    <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors" id="dropZone">
+                        <input type="file" name="document_file" id="documentInput" class="file-input file-input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800 opacity-0 absolute inset-0 cursor-pointer" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        <div class="text-center text-gray-600 pointer-events-none">
+                            <i class="fas fa-upload text-blue-500 text-2xl mb-2"></i>
+                            <p id="dropZoneText">Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)</p>
+                        </div>
+                    </div>
+                    <p id="fileName" class="text-sm text-gray-500 mt-2"></p>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Raison de Disponibilité</span></label>
+                    <textarea name="availability_reason" id="availabilityReason" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800"></textarea>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Raison d'Exclusion</span></label>
+                    <textarea name="exclusion_reason" id="exclusionReason" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800"></textarea>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Type de Sortie</span></label>
+                    <input type="text" name="exit_type" id="exitType" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                </div>
+                <div class="modal-action">
+                    <label for="createEventModal" class="btn btn-secondary">Annuler</label>
+                    <button class="btn btn-primary" id="submitSituationRequest">Soumettre</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/locales-all.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+
+    const ROLE = "{{ request.user.role|default:'' }}".trim().toUpperCase();
+    const userId = "{{ request.user.id|default:'' }}";
+    const employeeId = "{{ request.user.employee.id|default:'' }}";
+    const currentEmployeeName = "{{ request.user.employee.get_full_name|default:request.user.username }}";
+
+    // Utilities
+    function getCsrfToken() {
+        const cookie = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+        return cookie ? cookie.split('=')[1] : '';
+    }
+    const fmt = (d) => moment(d).format('YYYY-MM-DD');
+
+    // Event Mapping
+    function toEvent(item) {
+        const emp = item.employee || item.employee_detail || {};
+        const st = item.situation_type || item.situation_type_detail || {};
+        const empId = item.employee_id ?? emp.id ?? item.employee ?? null;
+        const empUserId = (emp.user && emp.user.id) ?? item.employee_user_id ?? item.user_id ?? null;
+        const endExclusive = item.end_date ? moment(item.end_date).add(1, 'day').format('YYYY-MM-DD') : null;
+
+        return {
+            id: item.id,
+            title: `${(emp.first_name || '')} ${(emp.last_name || '')}`.trim() + (st.name ? ` — ${st.name}` : ''),
+            start: item.start_date,
+            end: endExclusive,
+            allDay: true,
+            extendedProps: {
+                employee: emp,
+                employee_id: empId,
+                employee_user_id: empUserId,
+                situation_type: st,
+                status: item.status,
+                document: item.document,
+                availability_reason: item.availability_reason,
+                exclusion_reason: item.exclusion_reason,
+                exit_type: item.exit_type
+            }
+        };
+    }
+
+    // Ownership Check
+    function isOwnerFromEvent(ev) {
+        const emp = ev?.extendedProps?.employee || {};
+        console.log('Ownership check:', {
+            empUserId: emp?.user?.id,
+            extendedUserId: ev?.extendedProps?.employee_user_id,
+            empId: emp?.id,
+            extendedEmpId: ev?.extendedProps?.employee_id,
+            userId: '{{ request.user.id|default:"" }}',
+            employeeId: '{{ request.user.employee.id|default:"" }}'
+        });
+        return (
+            String(emp?.user?.id ?? '') === String('{{ request.user.id|default:"" }}') ||
+            String(ev?.extendedProps?.employee_user_id ?? '') === String('{{ request.user.id|default:"" }}') ||
+            String(emp?.id ?? '') === String('{{ request.user.employee.id|default:"" }}') ||
+            String(ev?.extendedProps?.employee_id ?? '') === String('{{ request.user.employee.id|default:"" }}')
+        );
+    }
+
+    // Edit/Delete Permissions
+    function canEmpEditOrDelete(ev) {
+        const status = String(ev?.extendedProps?.status || '').toLowerCase();
+        const startsInFuture = moment(ev.start).startOf('day').isAfter(moment().startOf('day'));
+        const isEmp = ROLE === 'EMP';
+        console.log('canEmpEditOrDelete:', {
+            role: ROLE,
+            isEmp,
+            status,
+            startsInFuture,
+            isOwner: isOwnerFromEvent(ev)
+        });
+        return isEmp && isOwnerFromEvent(ev) && status === 'en attente' && startsInFuture;
+    }
+
+    // Document Link Helpers
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m]));
+    }
+
+    function pickDocUrl(obj) {
+        if (!obj) return null;
+        return obj.file?.url || obj.file_url || obj.url || (typeof obj.file === 'string' ? obj.file : null);
+    }
+
+    function pickDocLabel(obj) {
+        if (!obj) return null;
+        return obj.original_name || obj.filename || obj.name || (typeof obj.file === 'string' ? obj.file.split('/').pop() : null);
+    }
+
+    async function extractDocLink(detail) {
+        if (!detail) return null;
+        let docObj = detail.document_detail || (typeof detail.document === 'object' ? detail.document : null) || null;
+        let docId = (typeof detail.document === 'number') ? detail.document : (docObj?.id || null);
+
+        if (!docObj && Array.isArray(detail.documents) && detail.documents.length) {
+            docObj = detail.documents[0];
+            docId = docObj?.id || docId;
+        }
+
+        let href = pickDocUrl(docObj) || detail.document_file || null;
+        let label = pickDocLabel(docObj);
+
+        if (!href && docId) {
+            try {
+                const doc = await $.getJSON(`/api/v1/documents/${docId}/`);
+                href = pickDocUrl(doc) || doc?.file || doc?.url || href;
+                label = label || pickDocLabel(doc);
+            } catch (_) {}
+        }
+
+        if (href && !/^https?:\/\//.test(href) && !href.startsWith('/')) {
+            href = '/' + href;
+        }
+
+        if (!label && href) {
+            try { label = decodeURIComponent(href.split('/').pop()); } catch { label = href.split('/').pop(); }
+        }
+
+        return href ? { href, label } : null;
+    }
+
+    async function renderDocumentLink(eventId) {
+        const el = document.getElementById('eventDocument');
+        if (!el) return;
+        el.textContent = 'Chargement...';
+        try {
+            const detail = await $.getJSON(`/api/v1/situations/situations/${eventId}/`);
+            const link = await extractDocLink(detail);
+            el.innerHTML = link ? `<a href="${link.href}" target="_blank" rel="noopener" class="underline text-blue-600">${escapeHtml(link.label || 'Voir le document')}</a>` : 'Aucun';
+        } catch (_) {
+            el.textContent = 'Aucun';
+        }
+    }
+
+    // FullCalendar
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'fr',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+        selectable: ROLE === 'EMP',
+        editable: ROLE === 'EMP',
+        height: 'auto',
+        expandRows: true,
+        eventStartEditable: true,
+        eventDurationEditable: true,
+        events: function(info, success, failure) {
+            const start = fmt(info.start), end = fmt(info.end);
+            fetch(`/api/v1/situations/situations/?date_range=${start} to ${end}&active=true`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => success((data.results || data || []).map(toEvent)))
+            .catch(err => {
+                console.error('Error fetching situations:', err);
+                failure(err);
+                showToast("Erreur lors du chargement des situations.", 'error');
+            });
+        },
+        eventDidMount: function(info) {
+            const status = info.event.extendedProps.status;
+            const el = info.el;
+            if (status === 'en attente') el.classList.add('bg-yellow-500', 'text-black');
+            else if (status === 'actif') el.classList.add('bg-success', 'text-white');
+            else if (status === 'terminé') el.classList.add('bg-error', 'text-white');
+        },
+        eventClick: function(info) {
+            const emp = info.event.extendedProps.employee || {};
+            const st = info.event.extendedProps.situation_type || {};
+            $('#eventEmployee').text(`${emp.first_name || ''} ${emp.last_name || ''}`.trim() || 'N/A');
+            $('#eventSituationType').text(st.name || 'N/A');
+            $('#eventStart').text(moment(info.event.start).format('YYYY-MM-DD'));
+            $('#eventEnd').text(info.event.end ? moment(info.event.end).subtract(1, 'days').format('YYYY-MM-DD') : 'Ongoing');
+            $('#eventStatus').text((info.event.extendedProps.status || '').replace('_', ' ').toUpperCase());
+            $('#eventAvailabilityReason').text(info.event.extendedProps.availability_reason || 'N/A');
+            $('#eventExclusionReason').text(info.event.extendedProps.exclusion_reason || 'N/A');
+            $('#eventExitType').text(info.event.extendedProps.exit_type || 'N/A');
+            renderDocumentLink(info.event.id);
+
+            const isEmployeeRole = ROLE === 'EMP';
+            const canEditOrDelete = canEmpEditOrDelete(info.event);
+            console.log('eventClick debug:', {
+                eventId: info.event.id,
+                isEmployeeRole,
+                isOwner: isOwnerFromEvent(info.event),
+                status: info.event.extendedProps.status,
+                startsInFuture: moment(info.event.start).startOf('day').isAfter(moment().startOf('day'))
+            });
+
+            let actions = '';
+            if (canEditOrDelete) {
+                actions += `<button class="btn btn-warning btn-sm mr-2" onclick="editSituation(${info.event.id})">Modifier</button>`;
+                actions += `<button class="btn btn-error btn-sm" onclick="deleteSituation(${info.event.id})">Supprimer</button>`;
+            }
+            $('#eventActions').toggle(!!actions).html(actions || '');
+            document.getElementById('eventModal').checked = true;
+        },
+        select: function(info) {
+            $('#situationCreateForm')[0].reset();
+            $('#startDate').val(fmt(info.start));
+            $('#endDate').val(info.end ? moment(info.end).subtract(1, 'days').format('YYYY-MM-DD') : '');
+            $('#availabilityReason').val('');
+            $('#exclusionReason').val('');
+            $('#exitType').val('');
+            $('#documentInput').val('');
+            $('#fileName').text('');
+            $('#createEventModalLabel').text('Nouvelle Situation Administrative');
+            $('#submitSituationRequest').removeData('id').text('Soumettre');
+
+            $.ajax({
+                url: '/api/v1/situation-types/',
+                method: 'GET',
+                success: function(data) {
+                    let opts = '<option value="" disabled selected>Sélectionner un type</option>';
+                    (data.results || data).forEach(st => {
+                        opts += `<option value="${st.id}">${st.name}</option>`;
+                    });
+                    $('#situationType').html(opts);
+                },
+                error: function(xhr) { showToast(drfMessage(xhr, 'Erreur lors du chargement des types de situation.'), 'error'); }
+            });
+
+            document.getElementById('createEventModal').checked = true;
+        },
+        eventAllow: function(dropInfo, draggedEvent) {
+            if (!canEmpEditOrDelete(draggedEvent)) return false;
+            return moment(dropInfo.start).startOf('day').isAfter(moment().startOf('day'));
+        },
+        eventDrop: function(info) {
+            if (!canEmpEditOrDelete(info.event)) {
+                info.revert();
+                return;
+            }
+            const payload = {
+                start_date: moment(info.event.start).format('YYYY-MM-DD'),
+                end_date: info.event.end ? moment(info.event.end).subtract(1, 'days').format('YYYY-MM-DD') : null
+            };
+            $.ajax({
+                url: `/api/v1/situations/situations/${info.event.id}/`,
+                type: 'PATCH',
+                data: JSON.stringify(payload),
+                contentType: 'application/json',
+                headers: { 'X-CSRFToken': getCsrfToken() }
+            })
+            .done(function() {
+                showToast('Dates mises à jour.', 'success');
+                calendar.refetchEvents();
+            })
+            .fail(function(xhr) {
+                showToast(drfMessage(xhr, 'Erreur lors de la mise à jour.'), 'error');
+                info.revert();
+            });
+        }
+    });
+
+    calendar.render();
+
+    // Document Upload UI
+    const dropZone = document.getElementById('dropZone');
+    const documentInput = document.getElementById('documentInput');
+    const dropZoneText = document.getElementById('dropZoneText');
+    const fileNameDisplay = document.getElementById('fileName');
+
+    function updateDocumentUI() {
+        const file = documentInput.files && documentInput.files[0] ? documentInput.files[0] : null;
+        fileNameDisplay.textContent = file ? `Fichier sélectionné : ${file.name}` : '';
+    }
+
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-blue-50');
+            dropZoneText.textContent = 'Relâchez pour déposer le fichier';
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+            if (e.dataTransfer?.files?.length) {
+                documentInput.files = e.dataTransfer.files;
+                updateDocumentUI();
+            }
+        });
+    }
+
+    documentInput.addEventListener('change', updateDocumentUI);
+
+    // Submit Handler
+    $('#submitSituationRequest').on('click', async function(e) {
+        e.preventDefault();
+        const id = $(this).data('id');
+        const url = id ? `/api/v1/situations/situations/${id}/` : '/api/v1/situations/situations/';
+        const method = id ? 'PATCH' : 'POST';
+        const formData = new FormData($('#situationCreateForm')[0]);
+        const situationTypeVal = $('#situationType').val();
+        if (!situationTypeVal) {
+            showToast('Veuillez sélectionner un type de situation.', 'error');
+            return;
+        }
+        formData.set('situation_type_id', situationTypeVal);
+        formData.set('employee_id', $('#employeeIdInput').val() || "{{ request.user.employee.id|default:'' }}");
+
+        try {
+            const file = documentInput.files[0];
+            if (file) {
+                const docFD = new FormData();
+                docFD.append('file', file);
+                docFD.append('document_type', 'autre');
+                docFD.append('status', 'to_validate');
+                const docResp = await $.ajax({
+                    url: '/api/v1/documents/',
+                    type: 'POST',
+                    data: docFD,
+                    processData: false,
+                    contentType: false,
+                    headers: { 'X-CSRFToken': getCsrfToken() }
+                });
+                if (docResp?.id) formData.set('document_id', docResp.id);
+            }
+
+            await $.ajax({
+                url,
+                type: method,
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: { 'X-CSRFToken': getCsrfToken() }
+            });
+
+            showToast('Situation enregistrée avec succès.', 'success');
+            $('#createEventModal').prop('checked', false);
+            calendar.refetchEvents();
+        } catch (xhr) {
+            showToast(drfMessage(xhr, 'Vérifiez les champs requis'), 'error');
+        }
+    });
+
+    // Edit/Delete Handlers
+    window.editSituation = function(id) {
+        $.get(`/api/v1/situations/situations/${id}/`, function(data) {
+            $('#startDate').val(data.start_date);
+            $('#endDate').val(data.end_date || '');
+            $('#availabilityReason').val(data.availability_reason || '');
+            $('#exclusionReason').val(data.exclusion_reason || '');
+            $('#exitType').val(data.exit_type || '');
+            const st = data.situation_type || data.situation_type_detail;
+            $('#situationType').html(`<option value="${st.id}" selected>${st.name}</option>`);
+            const emp = data.employee || data.employee_detail;
+            $('#employeeIdInput').val(emp.id);
+            $('#employeeSelectedLabel').val(`${emp.first_name || ''} ${emp.last_name || ''}`.trim());
+            $('#createEventModalLabel').text('Modifier la Situation Administrative');
+            $('#submitSituationRequest').data('id', id).text('Mettre à Jour');
+            document.getElementById('createEventModal').checked = true;
+        }).fail(function(xhr) {
+            showToast(drfMessage(xhr, 'Erreur lors du chargement.'), 'error');
+        });
+    };
+
+    window.deleteSituation = function(id) {
+        if (!confirm('Supprimer cette situation ?')) return;
+        $.ajax({
+            url: `/api/v1/situations/situations/${id}/`,
+            type: 'DELETE',
+            headers: { 'X-CSRFToken': getCsrfToken() },
+            success: function() {
+                calendar.refetchEvents();
+                document.getElementById('eventModal').checked = false;
+                showToast('Situation supprimée avec succès.', 'success');
+            },
+            error: function(xhr) {
+                showToast(drfMessage(xhr, 'Erreur lors de la suppression.'), 'error');
+            }
+        });
+    };
+
+    // Toast Notification
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const t = types[type] || types.error;
+        toast.className = `toast ${t.bg} ${t.text} border-l-4 ${t.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `<i class="fas ${t.icon} mt-1 mr-3"></i><div class="flex-1"><p class="text-sm font-medium">${message}</p></div><button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()"><i class="fas fa-times"></i></button>`;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    function drfMessage(xhr, fallback = 'Une erreur est survenue') {
+        try {
+            const data = xhr?.responseJSON || (xhr?.responseText ? JSON.parse(xhr.responseText) : null);
+            if (!data) return fallback;
+            if (typeof data === 'string') return data;
+            if (data.detail) return data.detail;
+            const lines = [];
+            for (const [k, v] of Object.entries(data)) {
+                if (v == null) continue;
+                if (Array.isArray(v)) lines.push(`${k}: ${v.join(', ')}`);
+                else if (typeof v === 'object') lines.push(`${k}: ${JSON.stringify(v)}`);
+                else lines.push(`${k}: ${v}`);
+            }
+            return lines.join('<br>') || fallback;
+        } catch {
+            return fallback;
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,204 @@
+{% extends 'main/base.html' %}
+{% block title %}Paramètres Paie — Barèmes & Tranches{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2"><i class="fas fa-scale-balanced"></i> Barèmes d'Impôt</h1>
+        <button id="btnNewTable" class="btn bg-orange-600 hover:bg-orange-700 text-white"><i class="fas fa-plus mr-2"></i>Nouveau Barème</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+        <div>
+          <label class="label"><span class="label-text">Pays</span></label>
+          <input id="filterCountry" class="input input-bordered input-sm w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="Code pays">
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Barème</span></label>
+          <select id="tableSelect" class="select select-bordered select-sm w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+        </div>
+        <div class="text-right">
+          <button id="btnReload" class="btn btn-success">Rafraîchir</button>
+        </div>
+      </div>
+
+      <!-- Table list -->
+      <div class="overflow-x-auto mt-4">
+        <table class="table w-full bg-gray-100 shadow rounded-lg p-4">
+          <thead>
+            <tr>
+                <th class="whitespace-nowrap text-blue-600">Pays</th>
+                <th class="whitespace-nowrap text-blue-600">Valide du</th>
+                <th class="whitespace-nowrap text-blue-600">au</th>
+                <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+        </thead>
+          <tbody id="tablesTbody"><tr><td colspan="4" class="text-center text-base-gray">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="divider my-6">Tranches</div>
+
+      <!-- Brackets -->
+      <div class="overflow-x-auto">
+        <table class="table w-full bg-gray-100 shadow rounded-lg p-4">
+          <thead>
+            <tr>
+                <th class="whitespace-nowrap text-blue-600">Inférieur</th>
+                <th class="whitespace-nowrap text-blue-600">Supérieur</th>
+                <th class="whitespace-nowrap text-blue-600">Taux</th>
+                <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+        </thead>
+          <tbody id="bracketsTbody"><tr><td colspan="4" class="text-center text-base-gray">Sélectionnez un barème</td></tr></tbody>
+        </table>
+      </div>
+      <div class="mt-3">
+        <button id="btnNewBracket" class="btn btn-primary" disabled><i class="fas fa-plus mr-2"></i>Nouvelle Tranche</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals -->
+<input type="checkbox" id="tableModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg" id="tableModalTitle">Nouveau Barème</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div><label class="label"><span class="label-text">Pays (ISO2)</span></label><input id="t_country" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="CI"></div>
+      <div><label class="label"><span class="label-text">Valide du</span></label><input id="t_from" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+      <div><label class="label"><span class="label-text">au</span></label><input id="t_to" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+    </div>
+    <div class="modal-action">
+      <label for="tableModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnSaveTable" class="btn bg-orange-600 hover:bg-orange-700 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<input type="checkbox" id="bracketModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg text-base-gray" id="bracketModalTitle">Nouvelle Tranche</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div><label class="label"><span class="label-text">Inférieur</span></label><input id="b_lower" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+      <div><label class="label"><span class="label-text">Supérieur (vide = ∞)</span></label><input id="b_upper" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+      <div><label class="label"><span class="label-text">Taux</span></label><input id="b_rate" type="number" step="0.0001" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="0.15 = 15%"></div>
+    </div>
+    <div class="modal-action">
+      <label for="bracketModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnSaveBracket" class="btn bg-orange-600 hover:bg-orange-700 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  function getCsrf(){ const m=document.cookie.match(/csrftoken=([^;]+)/); return m?m[1]:''; }
+  const state={page:1,size:10,country:'', tableId:null}; let editTableId=null, editBracketId=null;
+
+  async function loadTables(){
+    const params=new URLSearchParams(); params.set('page',state.page); params.set('page_size',state.size);
+    if (state.country) params.set('country',state.country);
+    tablesTbody.innerHTML=`<tr><td colspan="4" class="text-center text-base-gray">Chargement…</td></tr>`;
+    const r=await fetch('/api/v1/tax-tables/?'+params.toString()); const d=await r.json(); const rows=d.results||d||[];
+    if(!rows.length){ tablesTbody.innerHTML=`<tr><td colspan="4" class="text-center text-base-content/60">Aucun</td></tr>`; tableSelect.innerHTML='<option value="">—</option>'; bracketsTbody.innerHTML=`<tr><td colspan="4" class="text-center">Sélectionnez un barème</td></tr>`; return; }
+    tableSelect.innerHTML = '<option value="">—</option>' + rows.map(t=>`<option value="${t.id}">${t.country} • ${t.valid_from}${t.valid_to?(' → '+t.valid_to):''}</option>`).join('');
+    tablesTbody.innerHTML = rows.map(t=>`<tr>
+      <td>${t.country}</td><td>${t.valid_from}</td><td>${t.valid_to||'—'}</td>
+      <td class="text-right">
+        <button class="btn btn-xs bg-orange-500" data-edit="${t.id}"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-xs btn-error text-white" data-del="${t.id}"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+    tablesTbody.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openTable(b.dataset.edit)));
+    tablesTbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>delTable(b.dataset.del)));
+  }
+
+  async function loadBrackets(){
+    if (!state.tableId){ bracketsTbody.innerHTML=`<tr><td colspan="4" class="text-center">Sélectionnez un barème</td></tr>`; btnNewBracket.disabled=true; return; }
+    btnNewBracket.disabled=false;
+    bracketsTbody.innerHTML=`<tr><td colspan="4" class="text-center text-base-gray">Chargement…</td></tr>`;
+    const r=await fetch(`/api/v1/tax-brackets/?table=${state.tableId}&page_size=999`); const d=await r.json(); const rows=d.results||d||[];
+    if(!rows.length){ bracketsTbody.innerHTML=`<tr><td colspan="4" class="text-center text-base-content/60">Aucune tranche</td></tr>`; return; }
+    bracketsTbody.innerHTML = rows.map(b=>`<tr>
+      <td>${b.lower}</td><td>${b.upper||'∞'}</td><td>${b.rate}</td>
+      <td class="text-right">
+        <button class="btn btn-xs bg-orange-500" data-edit="${b.id}"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-xs btn-error text-white" data-del="${b.id}"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+    bracketsTbody.querySelectorAll('[data-edit]').forEach(x=>x.addEventListener('click',()=>openBracket(x.dataset.edit)));
+    bracketsTbody.querySelectorAll('[data-del]').forEach(x=>x.addEventListener('click',()=>delBracket(x.dataset.del)));
+  }
+
+  function openTable(id){
+    editTableId=id||null; tableModalTitle.textContent = id?'Modifier Barème':'Nouveau Barème';
+    t_country.value=''; t_from.value=''; t_to.value='';
+    if(id){
+      fetch(`/api/v1/tax-tables/${id}/`).then(r=>r.json()).then(x=>{
+        t_country.value=x.country||''; t_from.value=x.valid_from||''; t_to.value=x.valid_to||'';
+        tableModal.checked=true;
+      });
+    }else tableModal.checked=true;
+  }
+  async function saveTable(){
+    const payload={ country:t_country.value.trim().toUpperCase(), valid_from:t_from.value||null, valid_to:t_to.value||null };
+    if(!payload.country || !payload.valid_from){ showToast('Pays et date début requis','error'); return; }
+    const method=editTableId?'PUT':'POST';
+    const url = editTableId? `/api/v1/tax-tables/${editTableId}/` : '/api/v1/tax-tables/';
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},body:JSON.stringify(payload)});
+    if(!r.ok){ const e=await r.json().catch(()=>({detail:'Erreur'})); showToast(e.detail||JSON.stringify(e),'error'); return; }
+    tableModal.checked=false; showToast('Enregistré','success'); loadTables();
+  }
+  async function delTable(id){
+    if(!confirm('Supprimer ce barème ?')) return;
+    const r=await fetch(`/api/v1/tax-tables/${id}/`,{method:'DELETE',headers:{'X-CSRFToken':getCsrf()}});
+    if(!r.ok){ showToast('Suppression impossible','error'); return; }
+    showToast('Supprimé','success'); if(String(state.tableId)===String(id)) state.tableId=null; loadTables(); loadBrackets();
+  }
+
+  function openBracket(id){
+    editBracketId=id||null; bracketModalTitle.textContent=id?'Modifier Tranche':'Nouvelle Tranche';
+    b_lower.value=''; b_upper.value=''; b_rate.value='';
+    if(id){
+      fetch(`/api/v1/tax-brackets/${id}/`).then(r=>r.json()).then(x=>{
+        b_lower.value=x.lower; b_upper.value=x.upper||''; b_rate.value=x.rate;
+        bracketModal.checked=true;
+      });
+    } else bracketModal.checked=true;
+  }
+  async function saveBracket(){
+    if(!state.tableId){ showToast('Choisir un barème','error'); return; }
+    const payload={ table_id: state.tableId, lower: Number(b_lower.value||0), upper: b_upper.value? Number(b_upper.value): null, rate: Number(b_rate.value||0) };
+    if(!payload.rate){ showToast('Taux requis','error'); return; }
+    const method=editBracketId?'PUT':'POST';
+    const url = editBracketId? `/api/v1/tax-brackets/${editBracketId}/` : '/api/v1/tax-brackets/';
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},body:JSON.stringify(payload)});
+    if(!r.ok){ const e=await r.json().catch(()=>({detail:'Erreur'})); showToast(e.detail||JSON.stringify(e),'error'); return; }
+    bracketModal.checked=false; showToast('Enregistré','success'); loadBrackets();
+  }
+  async function delBracket(id){
+    if(!confirm('Supprimer cette tranche ?')) return;
+    const r=await fetch(`/api/v1/tax-brackets/${id}/`,{method:'DELETE',headers:{'X-CSRFToken':getCsrf()}});
+    if(!r.ok){ showToast('Suppression impossible','error'); return; }
+    showToast('Supprimé','success'); loadBrackets();
+  }
+
+  // wiring
+  btnNewTable.addEventListener('click',()=>openTable(null));
+  btnSaveTable.addEventListener('click',saveTable);
+  tableSelect.addEventListener('change',()=>{ state.tableId=tableSelect.value||null; loadBrackets(); });
+  btnNewBracket.addEventListener('click',()=>openBracket(null));
+  btnSaveBracket.addEventListener('click',saveBracket);
+  btnReload.addEventListener('click',()=>{ state.country=filterCountry.value.trim().toUpperCase(); loadTables(); });
+
+  loadTables();
+})();
+</script>
+{% endblock %}

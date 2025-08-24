@@ -1,0 +1,2581 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRMIS - Système de Gestion des Fonctionnaires</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --ci-orange: #FF8C00;
+            --ci-white: #FFFFFF;
+            --ci-green: #00B04F;
+            --ci-dark: #1a1a1a;
+            --ci-gray: #6c757d;
+            --ci-light-gray: #f8f9fa;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--ci-orange) 0%, var(--ci-white) 50%, var(--ci-green) 100%);
+            min-height: 100vh;
+            color: var(--ci-dark);
+        }
+
+        /* Navigation */
+        .navbar {
+            background: linear-gradient(90deg, var(--ci-orange), var(--ci-green));
+            padding: 1rem 2rem;
+            box-shadow: var(--shadow-lg);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .logo img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--ci-green);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--ci-white);
+            color: var(--ci-dark);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 80px;
+            width: 280px;
+            height: calc(100vh - 80px);
+            background: var(--ci-white);
+            box-shadow: var(--shadow);
+            padding: 2rem 0;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-menu {
+            list-style: none;
+        }
+
+        .sidebar-menu li {
+            margin: 0.5rem 0;
+        }
+
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 2rem;
+            color: var(--ci-dark);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background: linear-gradient(90deg, rgba(255,140,0,0.1), rgba(0,176,79,0.1));
+            border-left-color: var(--ci-orange);
+            color: var(--ci-green);
+        }
+
+        .sidebar-menu .submenu {
+            margin-left: 2rem;
+            display: none;
+        }
+
+        .sidebar-menu .has-submenu.expanded .submenu {
+            display: block;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            margin-top: 80px;
+            padding: 2rem;
+            min-height: calc(100vh - 80px);
+            transition: margin-left 0.3s ease;
+        }
+
+        .main-content.expanded {
+            margin-left: 0;
+        }
+
+        /* Dashboard Cards */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--ci-light-gray);
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .stat-label {
+            color: var(--ci-gray);
+            font-size: 0.9rem;
+        }
+
+        .orange-bg { background: var(--ci-orange); }
+        .green-bg { background: var(--ci-green); }
+        .gray-bg { background: var(--ci-gray); }
+
+        /* Tables */
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            margin: 2rem 0;
+        }
+
+        .table-header {
+            background: linear-gradient(90deg, var(--ci-orange), var(--ci-green));
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--ci-light-gray);
+        }
+
+        th {
+            background: var(--ci-light-gray);
+            font-weight: 600;
+            color: var(--ci-dark);
+        }
+
+        tbody tr:hover {
+            background: rgba(255,140,0,0.05);
+        }
+
+        /* Status badges */
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-success { background: rgba(0,176,79,0.1); color: var(--ci-green); }
+        .badge-warning { background: rgba(255,140,0,0.1); color: var(--ci-orange); }
+        .badge-danger { background: rgba(220,53,69,0.1); color: #dc3545; }
+        .badge-info { background: rgba(13,202,240,0.1); color: #0dcaf0; }
+
+        /* Forms */
+        .form-group {
+            margin: 1rem 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--ci-dark);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--ci-light-gray);
+            border-radius: 8px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--ci-green);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .navbar {
+                padding: 1rem;
+            }
+            
+            .nav-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-in {
+            animation: slideIn 0.5s ease forwards;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--ci-light-gray);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--ci-orange), var(--ci-green));
+            border-radius: 10px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .search-bar {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .search-bar input {
+            padding-left: 2.5rem;
+        }
+
+        .search-bar i {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--ci-gray);
+        }
+
+        .notification-badge {
+            background: #dc3545;
+            color: white;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.4rem;
+            border-radius: 50%;
+            position: absolute;
+            top: -5px;
+            right: -5px;
+        }
+
+        .toggle-sidebar {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 5px;
+        }
+
+        .toggle-sidebar:hover {
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button class="toggle-sidebar" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <div style="width: 40px; height: 40px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <span style="color: var(--ci-orange); font-weight: bold;">CI</span>
+                    </div>
+                    <span>HRMIS - République de Côte d'Ivoire</span>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="currentUser">Admin User</span>
+                    <span class="badge badge-success" id="userRole">ADMIN</span>
+                </div>
+                <button class="btn btn-secondary" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Déconnexion
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <ul class="sidebar-menu">
+            <li><a href="#" onclick="showDashboard()" class="active">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Tableau de Bord</span>
+            </a></li>
+            
+            <li class="has-submenu" onclick="toggleSubmenu(this)">
+                <a href="#">
+                    <i class="fas fa-users"></i>
+                    <span>Gestion des Employés</span>
+                    <i class="fas fa-chevron-down" style="margin-left: auto;"></i>
+                </a>
+                <ul class="submenu">
+                    <li><a href="#" onclick="showEmployees()">Liste des Employés</a></li>
+                    <li><a href="#" onclick="showAddEmployee()">Ajouter Employé</a></li>
+                    <li><a href="#" onclick="showDepartments()">Départements</a></li>
+                    <li><a href="#" onclick="showGrades()">Grades</a></li>
+                </ul>
+            </li>
+
+            <li class="has-submenu" onclick="toggleSubmenu(this)">
+                <a href="#">
+                    <i class="fas fa-clock"></i>
+                    <span>Présence</span>
+                    <i class="fas fa-chevron-down" style="margin-left: auto;"></i>
+                </a>
+                <ul class="submenu">
+                    <li><a href="#" onclick="showAttendance()">Registre de Présence</a></li>
+                    <li><a href="#" onclick="showAttendanceStats()">Statistiques</a></li>
+                </ul>
+            </li>
+
+            <li class="has-submenu" onclick="toggleSubmenu(this)">
+                <a href="#">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Congés</span>
+                    <i class="fas fa-chevron-down" style="margin-left: auto;"></i>
+                </a>
+                <ul class="submenu">
+                    <li><a href="#" onclick="showLeaveRequests()">Demandes de Congé</a></li>
+                    <li><a href="#" onclick="showLeaveCalendar()">Calendrier</a></li>
+                </ul>
+            </li>
+
+            <li class="has-submenu" onclick="toggleSubmenu(this)">
+                <a href="#">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Situations Admin.</span>
+                    <i class="fas fa-chevron-down" style="margin-left: auto;"></i>
+                </a>
+                <ul class="submenu">
+                    <li><a href="#" onclick="showSituations()">Situations Actuelles</a></li>
+                    <li><a href="#" onclick="showSituationHistory()">Historique</a></li>
+                </ul>
+            </li>
+
+            <li><a href="#" onclick="showPayroll()">
+                <i class="fas fa-money-check"></i>
+                <span>Paie</span>
+            </a></li>
+
+            <li><a href="#" onclick="showDocuments()">
+                <i class="fas fa-folder"></i>
+                <span>Documents</span>
+            </a></li>
+
+            <li><a href="#" onclick="showAuditLogs()">
+                <i class="fas fa-history"></i>
+                <span>Audit</span>
+            </a></li>
+
+            <li><a href="#" onclick="showNotifications()">
+                <i class="fas fa-bell"></i>
+                <span>Notifications</span>
+                <span class="notification-badge" id="notifCount">3</span>
+            </a></li>
+        </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content" id="mainContent">
+        <div id="contentArea">
+            <!-- Dashboard Content (Default) -->
+            <div id="dashboardContent" class="slide-in">
+                <h1 style="margin-bottom: 2rem; color: var(--ci-dark);">
+                    <i class="fas fa-tachometer-alt"></i>
+                    Tableau de Bord HRMIS
+                </h1>
+
+                <!-- Statistics Cards -->
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon orange-bg">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div>
+                                <h3>Total Employés</h3>
+                                <div class="stat-number" id="totalEmployees">1,247</div>
+                                <div class="stat-label">Fonctionnaires actifs</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon green-bg">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div>
+                                <h3>Présents Aujourd'hui</h3>
+                                <div class="stat-number" id="presentToday">1,156</div>
+                                <div class="stat-label">92.7% de présence</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon gray-bg">
+                                <i class="fas fa-calendar-times"></i>
+                            </div>
+                            <div>
+                                <h3>En Congé</h3>
+                                <div class="stat-number" id="onLeave">73</div>
+                                <div class="stat-label">Diverses situations</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon orange-bg">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div>
+                                <h3>Alertes</h3>
+                                <div class="stat-number" id="alerts">12</div>
+                                <div class="stat-label">Nécessitent attention</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activities -->
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3><i class="fas fa-clock"></i> Activités Récentes</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Heure</th>
+                                <th>Utilisateur</th>
+                                <th>Action</th>
+                                <th>Détails</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentActivities">
+                            <!-- Activities will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for Forms -->
+    <div class="modal" id="mainModal">
+        <div class="modal-content" id="modalContent">
+            <!-- Dynamic modal content -->
+        </div>
+    </div>
+
+    <script>
+        // Application State
+        let currentUser = { id: 1, username: 'admin', role: 'ADMIN', firstName: 'Admin', lastName: 'User' };
+        let employees = [];
+        let attendance = [];
+        let leaves = [];
+        let documents = [];
+        let auditLogs = [];
+        let notifications = [];
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            loadInitialData();
+            showDashboard();
+        });
+
+        // Mock API functions
+        function loadInitialData() {
+            // Mock data - in real app, these would be API calls
+            employees = [
+                { id: '123e4567-e89b-12d3-a456-426614174000', firstName: 'Jean', lastName: 'Kouassi', grade: 'A1', department: 'Administration', status: 'actif' },
+                { id: '123e4567-e89b-12d3-a456-426614174001', firstName: 'Marie', lastName: 'Yao', grade: 'B2', department: 'Finances', status: 'actif' },
+                { id: '123e4567-e89b-12d3-a456-426614174002', firstName: 'Paul', lastName: 'Diabaté', grade: 'A2', department: 'RH', status: 'actif' }
+            ];
+
+            auditLogs = [
+                { timestamp: new Date().toISOString(), user: 'Admin User', action: 'CREATE', objectType: 'Employee', objectId: '123', changes: 'Nouvel employé créé' },
+                { timestamp: new Date(Date.now() - 3600000).toISOString(), user: 'HR Officer', action: 'UPDATE', objectType: 'Attendance', objectId: '456', changes: 'Présence mise à jour' },
+                { timestamp: new Date(Date.now() - 7200000).toISOString(), user: 'Admin User', action: 'DELETE', objectType: 'Document', objectId: '789', changes: 'Document supprimé' }
+            ];
+
+            updateDashboardStats();
+            loadRecentActivities();
+        }
+
+        function updateDashboardStats() {
+            document.getElementById('totalEmployees').textContent = employees.length.toLocaleString();
+            document.getElementById('presentToday').textContent = Math.floor(employees.length * 0.927).toLocaleString();
+            document.getElementById('onLeave').textContent = Math.floor(employees.length * 0.058);
+            document.getElementById('alerts').textContent = '12';
+        }
+
+        function loadRecentActivities() {
+            const tbody = document.getElementById('recentActivities');
+            tbody.innerHTML = auditLogs.map(log => `
+                <tr>
+                    <td>${new Date(log.timestamp).toLocaleTimeString('fr-FR')}</td>
+                    <td>${log.user}</td>
+                    <td><span class="badge ${getBadgeClass(log.action)}">${log.action}</span></td>
+                    <td>${log.changes}</td>
+                    <td><span class="badge badge-success">Terminé</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function getBadgeClass(action) {
+            switch(action) {
+                case 'CREATE': return 'badge-success';
+                case 'UPDATE': return 'badge-warning';
+                case 'DELETE': return 'badge-danger';
+                default: return 'badge-info';
+            }
+        }
+
+        // Navigation functions
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+        }
+
+        function toggleSubmenu(element) {
+            element.classList.toggle('expanded');
+        }
+
+        function showDashboard() {
+            setActiveMenuItem('Tableau de Bord');
+            document.getElementById('contentArea').innerHTML = document.getElementById('dashboardContent').outerHTML;
+        }
+
+        function showEmployees() {
+            setActiveMenuItem('Liste des Employés');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                        <h1><i class="fas fa-users"></i> Gestion des Employés</h1>
+                        <button class="btn btn-primary" onclick="showAddEmployee()">
+                            <i class="fas fa-plus"></i> Ajouter Employé
+                        </button>
+                    </div>
+
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control" placeholder="Rechercher un employé..." onkeyup="filterEmployees(this.value)">
+                    </div>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nom Complet</th>
+                                    <th>Grade</th>
+                                    <th>Département</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeesTable">
+                                ${employees.map(emp => `
+                                    <tr>
+                                        <td>${emp.id.substring(0, 8)}...</td>
+                                        <td>${emp.firstName} ${emp.lastName}</td>
+                                        <td><span class="badge badge-info">${emp.grade}</span></td>
+                                        <td>${emp.department}</td>
+                                        <td><span class="badge ${emp.status === 'actif' ? 'badge-success' : 'badge-danger'}">${emp.status}</span></td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn btn-sm btn-secondary" onclick="viewEmployee('${emp.id}')">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-primary" onclick="editEmployee('${emp.id}')">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm" style="background: #dc3545; color: white;" onclick="deleteEmployee('${emp.id}')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAddEmployee() {
+            showModal(`
+                <h2><i class="fas fa-user-plus"></i> Ajouter un Nouvel Employé</h2>
+                <form onsubmit="submitEmployee(event)">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Prénom *</label>
+                            <input type="text" class="form-control" name="firstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nom *</label>
+                            <input type="text" class="form-control" name="lastName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Genre *</label>
+                            <select class="form-control" name="gender" required>
+                                <option value="">Sélectionner...</option>
+                                <option value="M">Masculin</option>
+                                <option value="F">Féminin</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date de Naissance</label>
+                            <input type="date" class="form-control" name="dateOfBirth">
+                        </div>
+                        <div class="form-group">
+                            <label>Nationalité</label>
+                            <input type="text" class="form-control" name="nationality" value="Ivoirienne">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact</label>
+                            <input type="text" class="form-control" name="contact" placeholder="+225 XX XX XX XX XX">
+                        </div>
+                        <div class="form-group">
+                            <label>Type d'Emploi *</label>
+                            <select class="form-control" name="employmentType" required>
+                                <option value="">Sélectionner...</option>
+                                <option value="Fonctionnaire">Fonctionnaire</option>
+                                <option value="Agent contractuel">Agent contractuel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Grade</label>
+                            <select class="form-control" name="grade">
+                                <option value="">Sélectionner...</option>
+                                <option value="A1">A1</option>
+                                <option value="A2">A2</option>
+                                <option value="B1">B1</option>
+                                <option value="B2">B2</option>
+                                <option value="C1">C1</option>
+                                <option value="C2">C2</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Département *</label>
+                            <select class="form-control" name="department" required>
+                                <option value="">Sélectionner...</option>
+                                <option value="Administration">Administration</option>
+                                <option value="Finances">Finances</option>
+                                <option value="Ressources Humaines">Ressources Humaines</option>
+                                <option value="Santé">Santé</option>
+                                <option value="Éducation">Éducation</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date d'Embauche *</label>
+                            <input type="date" class="form-control" name="hireDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Salaire de Base</label>
+                            <input type="number" class="form-control" name="baseSalary" placeholder="En FCFA">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse</label>
+                        <textarea class="form-control" name="address" rows="2"></textarea>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function submitEmployee(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const employee = Object.fromEntries(formData.entries());
+            
+            // Generate a mock ID
+            employee.id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+            
+            employee.status = 'actif';
+            employees.push(employee);
+            
+            // Add to audit log
+            auditLogs.unshift({
+                timestamp: new Date().toISOString(),
+                user: currentUser.firstName + ' ' + currentUser.lastName,
+                action: 'CREATE',
+                objectType: 'Employee',
+                objectId: employee.id,
+                changes: `Nouvel employé: ${employee.firstName} ${employee.lastName}`
+            });
+            
+            closeModal();
+            showEmployees();
+            showToast('Employé ajouté avec succès!', 'success');
+        }
+
+        function viewEmployee(id) {
+            const employee = employees.find(emp => emp.id === id);
+            if (!employee) return;
+            
+            showModal(`
+                <h2><i class="fas fa-user"></i> Détails de l'Employé</h2>
+                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 1rem; margin-bottom: 2rem;">
+                    <div style="width: 100px; height: 100px; background: var(--ci-light-gray); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--ci-gray);">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h3>${employee.firstName} ${employee.lastName}</h3>
+                        <p><span class="badge ${employee.status === 'actif' ? 'badge-success' : 'badge-danger'}">${employee.status}</span></p>
+                        <p>${employee.department} • ${employee.grade}</p>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div>
+                        <h4>Informations Personnelles</h4>
+                        <p><strong>Genre:</strong> ${employee.gender === 'M' ? 'Masculin' : 'Féminin'}</p>
+                        <p><strong>Date de Naissance:</strong> ${employee.dateOfBirth || 'Non spécifié'}</p>
+                        <p><strong>Nationalité:</strong> ${employee.nationality || 'Non spécifié'}</p>
+                    </div>
+                    <div>
+                        <h4>Informations Professionnelles</h4>
+                        <p><strong>Type:</strong> ${employee.employmentType}</p>
+                        <p><strong>Date d'Embauche:</strong> ${employee.hireDate || 'Non spécifié'}</p>
+                        <p><strong>Salaire de Base:</strong> ${employee.baseSalary ? employee.baseSalary + ' FCFA' : 'Non spécifié'}</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <h4>Contact</h4>
+                    <p><strong>Téléphone:</strong> ${employee.contact || 'Non spécifié'}</p>
+                    <p><strong>Adresse:</strong> ${employee.address || 'Non spécifié'}</p>
+                </div>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                    <button type="button" class="btn btn-primary" onclick="closeModal(); editEmployee('${employee.id}')">
+                        <i class="fas fa-edit"></i> Modifier
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                        Fermer
+                    </button>
+                </div>
+            `);
+        }
+
+        function editEmployee(id) {
+            const employee = employees.find(emp => emp.id === id);
+            if (!employee) return;
+            
+            showModal(`
+                <h2><i class="fas fa-user-edit"></i> Modifier Employé</h2>
+                <form onsubmit="updateEmployee(event, '${employee.id}')">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Prénom *</label>
+                            <input type="text" class="form-control" name="firstName" value="${employee.firstName}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nom *</label>
+                            <input type="text" class="form-control" name="lastName" value="${employee.lastName}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Genre *</label>
+                            <select class="form-control" name="gender" required>
+                                <option value="M" ${employee.gender === 'M' ? 'selected' : ''}>Masculin</option>
+                                <option value="F" ${employee.gender === 'F' ? 'selected' : ''}>Féminin</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date de Naissance</label>
+                            <input type="date" class="form-control" name="dateOfBirth" value="${employee.dateOfBirth || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Nationalité</label>
+                            <input type="text" class="form-control" name="nationality" value="${employee.nationality || 'Ivoirienne'}">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact</label>
+                            <input type="text" class="form-control" name="contact" value="${employee.contact || ''}" placeholder="+225 XX XX XX XX XX">
+                        </div>
+                        <div class="form-group">
+                            <label>Type d'Emploi *</label>
+                            <select class="form-control" name="employmentType" required>
+                                <option value="Fonctionnaire" ${employee.employmentType === 'Fonctionnaire' ? 'selected' : ''}>Fonctionnaire</option>
+                                <option value="Agent contractuel" ${employee.employmentType === 'Agent contractuel' ? 'selected' : ''}>Agent contractuel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Grade</label>
+                            <select class="form-control" name="grade">
+                                <option value="A1" ${employee.grade === 'A1' ? 'selected' : ''}>A1</option>
+                                <option value="A2" ${employee.grade === 'A2' ? 'selected' : ''}>A2</option>
+                                <option value="B1" ${employee.grade === 'B1' ? 'selected' : ''}>B1</option>
+                                <option value="B2" ${employee.grade === 'B2' ? 'selected' : ''}>B2</option>
+                                <option value="C1" ${employee.grade === 'C1' ? 'selected' : ''}>C1</option>
+                                <option value="C2" ${employee.grade === 'C2' ? 'selected' : ''}>C2</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Département *</label>
+                            <select class="form-control" name="department" required>
+                                <option value="Administration" ${employee.department === 'Administration' ? 'selected' : ''}>Administration</option>
+                                <option value="Finances" ${employee.department === 'Finances' ? 'selected' : ''}>Finances</option>
+                                <option value="Ressources Humaines" ${employee.department === 'Ressources Humaines' ? 'selected' : ''}>Ressources Humaines</option>
+                                <option value="Santé" ${employee.department === 'Santé' ? 'selected' : ''}>Santé</option>
+                                <option value="Éducation" ${employee.department === 'Éducation' ? 'selected' : ''}>Éducation</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date d'Embauche *</label>
+                            <input type="date" class="form-control" name="hireDate" value="${employee.hireDate}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Salaire de Base</label>
+                            <input type="number" class="form-control" name="baseSalary" value="${employee.baseSalary || ''}" placeholder="En FCFA">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse</label>
+                        <textarea class="form-control" name="address" rows="2">${employee.address || ''}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Statut</label>
+                        <select class="form-control" name="status">
+                            <option value="actif" ${employee.status === 'actif' ? 'selected' : ''}>Actif</option>
+                            <option value="inactif" ${employee.status === 'inactif' ? 'selected' : ''}>Inactif</option>
+                            <option value="suspendu" ${employee.status === 'suspendu' ? 'selected' : ''}>Suspendu</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function updateEmployee(event, id) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const updatedEmployee = Object.fromEntries(formData.entries());
+            
+            const index = employees.findIndex(emp => emp.id === id);
+            if (index !== -1) {
+                // Keep the original ID
+                updatedEmployee.id = id;
+                employees[index] = updatedEmployee;
+                
+                // Add to audit log
+                auditLogs.unshift({
+                    timestamp: new Date().toISOString(),
+                    user: currentUser.firstName + ' ' + currentUser.lastName,
+                    action: 'UPDATE',
+                    objectType: 'Employee',
+                    objectId: id,
+                    changes: `Mise à jour des informations de ${updatedEmployee.firstName} ${updatedEmployee.lastName}`
+                });
+                
+                closeModal();
+                showEmployees();
+                showToast('Employé mis à jour avec succès!', 'success');
+            }
+        }
+
+        function deleteEmployee(id) {
+            const employee = employees.find(emp => emp.id === id);
+            if (!employee) return;
+            
+            if (confirm(`Êtes-vous sûr de vouloir supprimer ${employee.firstName} ${employee.lastName}?`)) {
+                employees = employees.filter(emp => emp.id !== id);
+                
+                // Add to audit log
+                auditLogs.unshift({
+                    timestamp: new Date().toISOString(),
+                    user: currentUser.firstName + ' ' + currentUser.lastName,
+                    action: 'DELETE',
+                    objectType: 'Employee',
+                    objectId: id,
+                    changes: `Employé supprimé: ${employee.firstName} ${employee.lastName}`
+                });
+                
+                showEmployees();
+                showToast('Employé supprimé avec succès!', 'success');
+            }
+        }
+
+        function filterEmployees(searchTerm) {
+            const tbody = document.getElementById('employeesTable');
+            if (!tbody) return;
+            
+            const filtered = employees.filter(emp => 
+                `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                emp.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                emp.grade.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            
+            tbody.innerHTML = filtered.map(emp => `
+                <tr>
+                    <td>${emp.id.substring(0, 8)}...</td>
+                    <td>${emp.firstName} ${emp.lastName}</td>
+                    <td><span class="badge badge-info">${emp.grade}</span></td>
+                    <td>${emp.department}</td>
+                    <td><span class="badge ${emp.status === 'actif' ? 'badge-success' : 'badge-danger'}">${emp.status}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-secondary" onclick="viewEmployee('${emp.id}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="editEmployee('${emp.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm" style="background: #dc3545; color: white;" onclick="deleteEmployee('${emp.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function showDepartments() {
+            setActiveMenuItem('Départements');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-building"></i> Gestion des Départements</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-building"></i>
+                                </div>
+                                <div>
+                                    <h3>Départements</h3>
+                                    <div class="stat-number">12</div>
+                                    <div class="stat-label">Unités administratives</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div>
+                                    <h3>Employés</h3>
+                                    <div class="stat-number">1,247</div>
+                                    <div class="stat-label">Répartis par département</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3><i class="fas fa-list"></i> Liste des Départements</h3>
+                            <button class="btn btn-primary" onclick="showAddDepartment()">
+                                <i class="fas fa-plus"></i> Ajouter
+                            </button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Chef de Département</th>
+                                    <th>Nombre d'Employés</th>
+                                    <th>Budget Annuel</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Administration</td>
+                                    <td>Jean Kouassi</td>
+                                    <td>245</td>
+                                    <td>125,000,000 FCFA</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Finances</td>
+                                    <td>Marie Yao</td>
+                                    <td>187</td>
+                                    <td>98,500,000 FCFA</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Ressources Humaines</td>
+                                    <td>Paul Diabaté</td>
+                                    <td>56</td>
+                                    <td>45,200,000 FCFA</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAddDepartment() {
+            showModal(`
+                <h2><i class="fas fa-building"></i> Ajouter un Nouveau Département</h2>
+                <form onsubmit="addDepartment(event)">
+                    <div class="form-group">
+                        <label>Nom du Département *</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Chef de Département</label>
+                        <select class="form-control" name="head">
+                            <option value="">Sélectionner un employé...</option>
+                            ${employees.map(emp => `
+                                <option value="${emp.id}">${emp.firstName} ${emp.lastName}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Budget Annuel (FCFA)</label>
+                        <input type="number" class="form-control" name="budget">
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function addDepartment(event) {
+            event.preventDefault();
+            showToast('Département ajouté avec succès!', 'success');
+            closeModal();
+            showDepartments();
+        }
+
+        function showGrades() {
+            setActiveMenuItem('Grades');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-layer-group"></i> Gestion des Grades</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-layer-group"></i>
+                                </div>
+                                <div>
+                                    <h3>Grades</h3>
+                                    <div class="stat-number">6</div>
+                                    <div class="stat-label">Niveaux hiérarchiques</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <div>
+                                    <h3>Employés</h3>
+                                    <div class="stat-number">1,247</div>
+                                    <div class="stat-label">Répartis par grade</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3><i class="fas fa-list"></i> Structure des Grades</h3>
+                            <button class="btn btn-primary" onclick="showAddGrade()">
+                                <i class="fas fa-plus"></i> Ajouter
+                            </button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Grade</th>
+                                    <th>Description</th>
+                                    <th>Échelle Salariale</th>
+                                    <th>Nombre d'Employés</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>A1</strong></td>
+                                    <td>Cadre Supérieur</td>
+                                    <td>1,500,000 - 2,500,000 FCFA</td>
+                                    <td>42</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>A2</strong></td>
+                                    <td>Cadre Moyen</td>
+                                    <td>1,000,000 - 1,500,000 FCFA</td>
+                                    <td>156</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>B1</strong></td>
+                                    <td>Agent Principal</td>
+                                    <td>750,000 - 1,000,000 FCFA</td>
+                                    <td>287</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAddGrade() {
+            showModal(`
+                <h2><i class="fas fa-layer-group"></i> Ajouter un Nouveau Grade</h2>
+                <form onsubmit="addGrade(event)">
+                    <div class="form-group">
+                        <label>Code du Grade *</label>
+                        <input type="text" class="form-control" name="code" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description *</label>
+                        <input type="text" class="form-control" name="description" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Échelle Salariale Minimum (FCFA) *</label>
+                        <input type="number" class="form-control" name="minSalary" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Échelle Salariale Maximum (FCFA) *</label>
+                        <input type="number" class="form-control" name="maxSalary" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Avantages</label>
+                        <textarea class="form-control" name="benefits" rows="3"></textarea>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function addGrade(event) {
+            event.preventDefault();
+            showToast('Grade ajouté avec succès!', 'success');
+            closeModal();
+            showGrades();
+        }
+
+        function showAttendance() {
+            setActiveMenuItem('Registre de Présence');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-clock"></i> Gestion des Présences</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-user-check"></i>
+                                </div>
+                                <div>
+                                    <h3>Présents Aujourd'hui</h3>
+                                    <div class="stat-number">1,156</div>
+                                    <div class="stat-label">92.7% de présence</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-user-times"></i>
+                                </div>
+                                <div>
+                                    <h3>Absents Aujourd'hui</h3>
+                                    <div class="stat-number">91</div>
+                                    <div class="stat-label">7.3% d'absence</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3><i class="fas fa-calendar-day"></i> Présence du Jour</h3>
+                            <div style="display: flex; gap: 1rem;">
+                                <input type="date" class="form-control" style="width: 200px;" value="${new Date().toISOString().split('T')[0]}">
+                                <button class="btn btn-primary">
+                                    <i class="fas fa-sync-alt"></i> Actualiser
+                                </button>
+                                <button class="btn btn-secondary" onclick="showBulkAttendance()">
+                                    <i class="fas fa-user-edit"></i> Saisie Groupée
+                                </button>
+                            </div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Employé</th>
+                                    <th>Département</th>
+                                    <th>Heure d'Arrivée</th>
+                                    <th>Heure de Départ</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${employees.slice(0, 5).map(emp => `
+                                    <tr>
+                                        <td>${emp.firstName} ${emp.lastName}</td>
+                                        <td>${emp.department}</td>
+                                        <td>08:${Math.floor(Math.random() * 15) + 10}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}</td>
+                                        <td>17:${Math.floor(Math.random() * 15) + 30}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}</td>
+                                        <td><span class="badge badge-success">Présent</span></td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showBulkAttendance() {
+            showModal(`
+                <h2><i class="fas fa-user-edit"></i> Saisie Groupée de Présence</h2>
+                <form onsubmit="submitBulkAttendance(event)">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                        <div class="form-group" style="flex: 1; margin-right: 1rem;">
+                            <label>Date *</label>
+                            <input type="date" class="form-control" name="date" value="${new Date().toISOString().split('T')[0]}" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Filtrer par Département</label>
+                            <select class="form-control" name="department">
+                                <option value="">Tous les départements</option>
+                                <option value="Administration">Administration</option>
+                                <option value="Finances">Finances</option>
+                                <option value="Ressources Humaines">Ressources Humaines</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--ci-light-gray); border-radius: 8px; padding: 1rem;">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Employé</th>
+                                    <th>Département</th>
+                                    <th>Statut</th>
+                                    <th>Heures</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${employees.slice(0, 10).map(emp => `
+                                    <tr>
+                                        <td>${emp.firstName} ${emp.lastName}</td>
+                                        <td>${emp.department}</td>
+                                        <td>
+                                            <select class="form-control" name="status_${emp.id}" style="min-width: 120px;">
+                                                <option value="present">Présent</option>
+                                                <option value="absent">Absent</option>
+                                                <option value="late">En retard</option>
+                                                <option value="leave">Congé</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; gap: 0.5rem;">
+                                                <input type="time" class="form-control" name="arrival_${emp.id}" style="width: 100px;">
+                                                <input type="time" class="form-control" name="departure_${emp.id}" style="width: 100px;">
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function submitBulkAttendance(event) {
+            event.preventDefault();
+            showToast('Présences enregistrées avec succès!', 'success');
+            closeModal();
+            showAttendance();
+        }
+
+        function showAttendanceStats() {
+            setActiveMenuItem('Statistiques');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-chart-bar"></i> Statistiques de Présence</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-calendar-week"></i>
+                                </div>
+                                <div>
+                                    <h3>Présence Hebdomadaire</h3>
+                                    <div class="stat-number">93.2%</div>
+                                    <div class="stat-label">Moyenne cette semaine</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-calendar-month"></i>
+                                </div>
+                                <div>
+                                    <h3>Présence Mensuelle</h3>
+                                    <div class="stat-number">91.5%</div>
+                                    <div class="stat-label">Moyenne ce mois</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="margin-top: 2rem;">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-line"></i> Tendance de Présence</h3>
+                            <div style="display: flex; gap: 1rem;">
+                                <select class="form-control" style="width: 150px;">
+                                    <option>Ce Mois</option>
+                                    <option>3 Derniers Mois</option>
+                                    <option>Cette Année</option>
+                                </select>
+                                <select class="form-control" style="width: 200px;">
+                                    <option>Tous les Départements</option>
+                                    <option>Administration</option>
+                                    <option>Finances</option>
+                                    <option>Ressources Humaines</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="padding: 2rem;">
+                            <div style="height: 300px; background: var(--ci-light-gray); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                <p style="color: var(--ci-gray);">Graphique de tendance de présence</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container" style="margin-top: 2rem;">
+                        <div class="table-header">
+                            <h3><i class="fas fa-table"></i> Détails par Département</h3>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Département</th>
+                                    <th>Présence Hebdo.</th>
+                                    <th>Présence Mens.</th>
+                                    <th>Retards</th>
+                                    <th>Absences</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Administration</td>
+                                    <td>94.1%</td>
+                                    <td>92.3%</td>
+                                    <td>12</td>
+                                    <td>8</td>
+                                </tr>
+                                <tr>
+                                    <td>Finances</td>
+                                    <td>93.5%</td>
+                                    <td>91.8%</td>
+                                    <td>9</td>
+                                    <td>5</td>
+                                </tr>
+                                <tr>
+                                    <td>Ressources Humaines</td>
+                                    <td>91.2%</td>
+                                    <td>89.7%</td>
+                                    <td>15</td>
+                                    <td>11</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showLeaveRequests() {
+            setActiveMenuItem('Demandes de Congé');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-calendar-alt"></i> Gestion des Congés</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                                <div>
+                                    <h3>Congés Approuvés</h3>
+                                    <div class="stat-number">42</div>
+                                    <div class="stat-label">Ce mois</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-calendar-times"></i>
+                                </div>
+                                <div>
+                                    <h3>Congés en Attente</h3>
+                                    <div class="stat-number">18</div>
+                                    <div class="stat-label">Nécessitent approbation</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3><i class="fas fa-list"></i> Demandes Récentes</h3>
+                            <button class="btn btn-primary" onclick="showAddLeaveRequest()">
+                                <i class="fas fa-plus"></i> Nouvelle Demande
+                            </button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Employé</th>
+                                    <th>Type</th>
+                                    <th>Période</th>
+                                    <th>Jours</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Jean Kouassi</td>
+                                    <td>Congé Annuel</td>
+                                    <td>15 Juil - 30 Juil 2023</td>
+                                    <td>15</td>
+                                    <td><span class="badge badge-success">Approuvé</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Marie Yao</td>
+                                    <td>Congé Maladie</td>
+                                    <td>5 Juil - 12 Juil 2023</td>
+                                    <td>7</td>
+                                    <td><span class="badge badge-success">Approuvé</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Paul Diabaté</td>
+                                    <td>Congé Exceptionnel</td>
+                                    <td>20 Juil - 22 Juil 2023</td>
+                                    <td>2</td>
+                                    <td><span class="badge badge-warning">En Attente</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm" style="background: var(--ci-green); color: white;">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button class="btn btn-sm" style="background: #dc3545; color: white;">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAddLeaveRequest() {
+            showModal(`
+                <h2><i class="fas fa-calendar-plus"></i> Nouvelle Demande de Congé</h2>
+                <form onsubmit="submitLeaveRequest(event)">
+                    <div class="form-group">
+                        <label>Employé *</label>
+                        <select class="form-control" name="employee" required>
+                            <option value="">Sélectionner un employé...</option>
+                            ${employees.map(emp => `
+                                <option value="${emp.id}">${emp.firstName} ${emp.lastName} (${emp.department})</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Type de Congé *</label>
+                        <select class="form-control" name="type" required>
+                            <option value="">Sélectionner...</option>
+                            <option value="annual">Congé Annuel</option>
+                            <option value="sick">Congé Maladie</option>
+                            <option value="maternity">Congé Maternité</option>
+                            <option value="paternity">Congé Paternité</option>
+                            <option value="special">Congé Exceptionnel</option>
+                        </select>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Date de Début *</label>
+                            <input type="date" class="form-control" name="startDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Date de Fin *</label>
+                            <input type="date" class="form-control" name="endDate" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Raison</label>
+                        <textarea class="form-control" name="reason" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Documents Justificatifs</label>
+                        <input type="file" class="form-control" name="documents" multiple>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Soumettre</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function submitLeaveRequest(event) {
+            event.preventDefault();
+            showToast('Demande de congé soumise avec succès!', 'success');
+            closeModal();
+            showLeaveRequests();
+        }
+
+        function showLeaveCalendar() {
+            setActiveMenuItem('Calendrier');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-calendar-alt"></i> Calendrier des Congés</h1>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-calendar"></i> Vue Mensuelle</h3>
+                            <div style="display: flex; gap: 1rem;">
+                                <button class="btn btn-secondary">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <h3 style="margin: 0;">Juillet 2023</h3>
+                                <button class="btn btn-secondary">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                                <select class="form-control" style="width: 200px;">
+                                    <option value="">Tous les Départements</option>
+                                    <option value="Administration">Administration</option>
+                                    <option value="Finances">Finances</option>
+                                    <option value="Ressources Humaines">Ressources Humaines</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div style="height: 600px; background: var(--ci-light-gray); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                <p style="color: var(--ci-gray);">Calendrier des congés interactif</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showSituations() {
+            setActiveMenuItem('Situations Actuelles');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-file-alt"></i> Situations Administratives</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <div>
+                                    <h3>Situations Actives</h3>
+                                    <div class="stat-number">1,247</div>
+                                    <div class="stat-label">Fonctionnaires en activité</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-user-clock"></i>
+                                </div>
+                                <div>
+                                    <h3>En Attente</h3>
+                                    <div class="stat-number">42</div>
+                                    <div class="stat-label">Dossiers en traitement</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3><i class="fas fa-list"></i> Dossiers Récemment Mis à Jour</h3>
+                            <button class="btn btn-primary" onclick="showAddSituation()">
+                                <i class="fas fa-plus"></i> Nouvelle Situation
+                            </button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Employé</th>
+                                    <th>Type</th>
+                                    <th>Date d'Effet</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Jean Kouassi</td>
+                                    <td>Promotion</td>
+                                    <td>01 Juil 2023</td>
+                                    <td><span class="badge badge-success">Approuvée</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Marie Yao</td>
+                                    <td>Mutation</td>
+                                    <td>15 Juil 2023</td>
+                                    <td><span class="badge badge-warning">En Cours</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Paul Diabaté</td>
+                                    <td>Retraite</td>
+                                    <td>01 Août 2023</td>
+                                    <td><span class="badge badge-info">Planifiée</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAddSituation() {
+            showModal(`
+                <h2><i class="fas fa-file-alt"></i> Nouvelle Situation Administrative</h2>
+                <form onsubmit="submitSituation(event)">
+                    <div class="form-group">
+                        <label>Employé *</label>
+                        <select class="form-control" name="employee" required>
+                            <option value="">Sélectionner un employé...</option>
+                            ${employees.map(emp => `
+                                <option value="${emp.id}">${emp.firstName} ${emp.lastName} (${emp.department})</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Type de Situation *</label>
+                        <select class="form-control" name="type" required>
+                            <option value="">Sélectionner...</option>
+                            <option value="promotion">Promotion</option>
+                            <option value="transfer">Mutation</option>
+                            <option value="retirement">Retraite</option>
+                            <option value="disciplinary">Sanction</option>
+                            <option value="other">Autre</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date d'Effet *</label>
+                        <input type="date" class="form-control" name="effectiveDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description *</label>
+                        <textarea class="form-control" name="description" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Documents Justificatifs</label>
+                        <input type="file" class="form-control" name="documents" multiple>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Soumettre</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function submitSituation(event) {
+            event.preventDefault();
+            showToast('Situation administrative enregistrée avec succès!', 'success');
+            closeModal();
+            showSituations();
+        }
+
+        function showSituationHistory() {
+            setActiveMenuItem('Historique');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-history"></i> Historique des Situations</h1>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-filter"></i> Filtres</h3>
+                            <div style="display: flex; gap: 1rem;">
+                                <select class="form-control" style="width: 200px;">
+                                    <option value="">Tous les Types</option>
+                                    <option value="promotion">Promotions</option>
+                                    <option value="transfer">Mutations</option>
+                                    <option value="retirement">Retraites</option>
+                                </select>
+                                <select class="form-control" style="width: 200px;">
+                                    <option value="">Tous les Départements</option>
+                                    <option value="Administration">Administration</option>
+                                    <option value="Finances">Finances</option>
+                                    <option value="Ressources Humaines">Ressources Humaines</option>
+                                </select>
+                                <input type="date" class="form-control" style="width: 150px;" placeholder="De">
+                                <input type="date" class="form-control" style="width: 150px;" placeholder="À">
+                                <button class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Appliquer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container" style="margin-top: 2rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Employé</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>01 Juil 2023</td>
+                                    <td>Jean Kouassi</td>
+                                    <td>Promotion</td>
+                                    <td>Promotion au grade A1</td>
+                                    <td><span class="badge badge-success">Terminé</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>15 Juin 2023</td>
+                                    <td>Marie Yao</td>
+                                    <td>Mutation</td>
+                                    <td>Mutation vers Finances</td>
+                                    <td><span class="badge badge-success">Terminé</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>01 Mai 2023</td>
+                                    <td>Paul Diabaté</td>
+                                    <td>Sanction</td>
+                                    <td>Avertissement écrit</td>
+                                    <td><span class="badge badge-success">Terminé</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showPayroll() {
+            setActiveMenuItem('Paie');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-money-check"></i> Gestion de la Paie</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                                <div>
+                                    <h3>Paie du Mois</h3>
+                                    <div class="stat-number">1,247</div>
+                                    <div class="stat-label">Fiches de paie générées</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div>
+                                    <h3>Masse Salariale</h3>
+                                    <div class="stat-number">1,245,000,000</div>
+                                    <div class="stat-label">FCFA ce mois</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="margin-top: 2rem;">
+                        <div class="card-header">
+                            <h3><i class="fas fa-calendar"></i> Période de Paie</h3>
+                            <div style="display: flex; gap: 1rem;">
+                                <select class="form-control" style="width: 200px;">
+                                    <option>Juillet 2023</option>
+                                    <option>Juin 2023</option>
+                                    <option>Mai 2023</option>
+                                </select>
+                                <button class="btn btn-primary">
+                                    <i class="fas fa-calculator"></i> Calculer Paie
+                                </button>
+                                <button class="btn btn-secondary">
+                                    <i class="fas fa-file-export"></i> Exporter
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container" style="margin-top: 2rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Employé</th>
+                                    <th>Département</th>
+                                    <th>Grade</th>
+                                    <th>Salaire de Base</th>
+                                    <th>Retenues</th>
+                                    <th>Net à Payer</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${employees.slice(0, 5).map(emp => {
+                                    const baseSalary = Math.floor(Math.random() * 1000000) + 500000;
+                                    const deductions = Math.floor(baseSalary * 0.1);
+                                    const netSalary = baseSalary - deductions;
+                                    
+                                    return `
+                                        <tr>
+                                            <td>${emp.firstName} ${emp.lastName}</td>
+                                            <td>${emp.department}</td>
+                                            <td>${emp.grade}</td>
+                                            <td>${baseSalary.toLocaleString()} FCFA</td>
+                                            <td>${deductions.toLocaleString()} FCFA</td>
+                                            <td><strong>${netSalary.toLocaleString()} FCFA</strong></td>
+                                            <td><span class="badge badge-success">Payé</span></td>
+                                            <td>
+                                                <div class="action-buttons">
+                                                    <button class="btn btn-sm btn-secondary">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-primary">
+                                                        <i class="fas fa-print"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showDocuments() {
+            setActiveMenuItem('Documents');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-folder"></i> Gestion des Documents</h1>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon orange-bg">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <div>
+                                    <h3>Documents</h3>
+                                    <div class="stat-number">3,842</div>
+                                    <div class="stat-label">Documents archivés</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon green-bg">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <div>
+                                    <h3>Par Employé</h3>
+                                    <div class="stat-number">12.7</div>
+                                    <div class="stat-label">Moyenne par employé</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container" style="margin-top: 2rem;">
+                        <div class="table-header">
+                            <h3><i class="fas fa-list"></i> Documents Récemment Ajoutés</h3>
+                            <button class="btn btn-primary" onclick="showUploadDocument()">
+                                <i class="fas fa-upload"></i> Uploader
+                            </button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Type</th>
+                                    <th>Employé</th>
+                                    <th>Date</th>
+                                    <th>Taille</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Contrat_Jean_Kouassi.pdf</td>
+                                    <td>Contrat</td>
+                                    <td>Jean Kouassi</td>
+                                    <td>15 Juil 2023</td>
+                                    <td>2.4 MB</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                            <button class="btn btn-sm" style="background: #dc3545; color: white;">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Diplome_Marie_Yao.pdf</td>
+                                    <td>Diplôme</td>
+                                    <td>Marie Yao</td>
+                                    <td>10 Juil 2023</td>
+                                    <td>1.8 MB</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                            <button class="btn btn-sm" style="background: #dc3545; color: white;">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Photo_Paul_Diabate.jpg</td>
+                                    <td>Photo</td>
+                                    <td>Paul Diabaté</td>
+                                    <td>05 Juil 2023</td>
+                                    <td>0.5 MB</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-secondary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                            <button class="btn btn-sm" style="background: #dc3545; color: white;">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showUploadDocument() {
+            showModal(`
+                <h2><i class="fas fa-upload"></i> Uploader un Document</h2>
+                <form onsubmit="uploadDocument(event)">
+                    <div class="form-group">
+                        <label>Employé *</label>
+                        <select class="form-control" name="employee" required>
+                            <option value="">Sélectionner un employé...</option>
+                            ${employees.map(emp => `
+                                <option value="${emp.id}">${emp.firstName} ${emp.lastName} (${emp.department})</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Type de Document *</label>
+                        <select class="form-control" name="type" required>
+                            <option value="">Sélectionner...</option>
+                            <option value="contract">Contrat</option>
+                            <option value="diploma">Diplôme</option>
+                            <option value="id">Pièce d'Identité</option>
+                            <option value="photo">Photo</option>
+                            <option value="other">Autre</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fichier *</label>
+                        <input type="file" class="form-control" name="file" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Uploader</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function uploadDocument(event) {
+            event.preventDefault();
+            showToast('Document uploadé avec succès!', 'success');
+            closeModal();
+            showDocuments();
+        }
+
+        function showAuditLogs() {
+            setActiveMenuItem('Audit');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-history"></i> Journal d'Audit</h1>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-filter"></i> Filtres</h3>
+                            <div style="display: flex; gap: 1rem;">
+                                <select class="form-control" style="width: 200px;">
+                                    <option value="">Toutes les Actions</option>
+                                    <option value="CREATE">Création</option>
+                                    <option value="UPDATE">Modification</option>
+                                    <option value="DELETE">Suppression</option>
+                                </select>
+                                <select class="form-control" style="width: 200px;">
+                                    <option value="">Tous les Utilisateurs</option>
+                                    <option value="admin">Admin User</option>
+                                    <option value="hr">HR Officer</option>
+                                </select>
+                                <input type="date" class="form-control" style="width: 150px;" placeholder="De">
+                                <input type="date" class="form-control" style="width: 150px;" placeholder="À">
+                                <button class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Appliquer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container" style="margin-top: 2rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date/Heure</th>
+                                    <th>Utilisateur</th>
+                                    <th>Action</th>
+                                    <th>Objet</th>
+                                    <th>Détails</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${auditLogs.map(log => `
+                                    <tr>
+                                        <td>${new Date(log.timestamp).toLocaleString('fr-FR')}</td>
+                                        <td>${log.user}</td>
+                                        <td><span class="badge ${getBadgeClass(log.action)}">${log.action}</span></td>
+                                        <td>${log.objectType}</td>
+                                        <td>${log.changes}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showNotifications() {
+            setActiveMenuItem('Notifications');
+            document.getElementById('contentArea').innerHTML = `
+                <div class="slide-in">
+                    <h1 style="margin-bottom: 2rem;"><i class="fas fa-bell"></i> Notifications</h1>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-inbox"></i> Boîte de Réception</h3>
+                            <button class="btn btn-secondary" onclick="markAllAsRead()">
+                                <i class="fas fa-check-double"></i> Tout marquer comme lu
+                            </button>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div class="notification-item" style="display: flex; padding: 1rem; border-bottom: 1px solid var(--ci-light-gray);">
+                                <div style="margin-right: 1rem; color: var(--ci-orange);">
+                                    <i class="fas fa-exclamation-circle fa-lg"></i>
+                                </div>
+                                <div style="flex: 1;">
+                                    <h4 style="margin: 0 0 0.5rem 0;">Nouvelle demande de congé</h4>
+                                    <p style="margin: 0; color: var(--ci-gray);">Paul Diabaté a soumis une demande de congé exceptionnel pour le 20-22 Juillet</p>
+                                    <small style="color: var(--ci-gray);">Il y a 2 heures</small>
+                                </div>
+                                <button class="btn btn-sm" style="align-self: center;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="notification-item" style="display: flex; padding: 1rem; border-bottom: 1px solid var(--ci-light-gray);">
+                                <div style="margin-right: 1rem; color: var(--ci-green);">
+                                    <i class="fas fa-check-circle fa-lg"></i>
+                                </div>
+                                <div style="flex: 1;">
+                                    <h4 style="margin: 0 0 0.5rem 0;">Paie calculée</h4>
+                                    <p style="margin: 0; color: var(--ci-gray);">Le calcul de la paie pour Juillet 2023 a été complété avec succès</p>
+                                    <small style="color: var(--ci-gray);">Hier, 15:32</small>
+                                </div>
+                                <button class="btn btn-sm" style="align-self: center;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="notification-item" style="display: flex; padding: 1rem;">
+                                <div style="margin-right: 1rem; color: var(--ci-gray);">
+                                    <i class="fas fa-info-circle fa-lg"></i>
+                                </div>
+                                <div style="flex: 1;">
+                                    <h4 style="margin: 0 0 0.5rem 0;">Mise à jour système</h4>
+                                    <p style="margin: 0; color: var(--ci-gray);">Une nouvelle version de HRMIS est disponible (v2.3.1)</p>
+                                    <small style="color: var(--ci-gray);">12 Juillet 2023</small>
+                                </div>
+                                <button class="btn btn-sm" style="align-self: center;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Clear notification count
+            document.getElementById('notifCount').textContent = '0';
+        }
+
+        function markAllAsRead() {
+            showToast('Toutes les notifications marquées comme lues', 'success');
+            // In a real app, you would update the server here
+        }
+
+        // Utility functions
+        function setActiveMenuItem(menuText) {
+            const menuItems = document.querySelectorAll('.sidebar-menu a');
+            menuItems.forEach(item => {
+                if (item.querySelector('span')?.textContent === menuText) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        function showModal(content) {
+            document.getElementById('modalContent').innerHTML = content;
+            document.getElementById('mainModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('mainModal').classList.remove('active');
+        }
+
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px';
+            toast.style.right = '20px';
+            toast.style.padding = '1rem 1.5rem';
+            toast.style.backgroundColor = type === 'success' ? 'var(--ci-green)' : 'var(--ci-orange)';
+            toast.style.color = 'white';
+            toast.style.borderRadius = '8px';
+            toast.style.boxShadow = 'var(--shadow-lg)';
+            toast.style.zIndex = '3000';
+            toast.style.animation = 'slideIn 0.3s ease forwards';
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse forwards';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        function logout() {
+            if (confirm('Êtes-vous sûr de vouloir vous déconnecter?')) {
+                // In a real app, you would redirect to login page
+                alert('Déconnexion réussie. Redirection vers la page de connexion...');
+            }
+        }
+    </script>
+</body>
+</html>

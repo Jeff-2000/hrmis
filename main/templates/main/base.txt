@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HRMIS - République de Côte d'Ivoire{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --ci-orange: #FF8C00;
+            --ci-white: #FFFFFF;
+            --ci-green: #00B04F;
+            --ci-dark: #1a1a1a;
+            --ci-gray: #6c757d;
+            --ci-light-gray: #f8f9fa;
+            --ci-dark-gray: #343a40;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* background-color: #f5f5f5;*/
+            background: linear-gradient(135deg, var(--ci-orange) 0%, var(--ci-white) 50%, var(--ci-green) 100%);
+            color: var(--ci-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation Bar */
+        .top-navbar {
+            background: linear-gradient(90deg, var(--ci-orange), var(--ci-green));
+            color: white;
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-lg);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            height: 60px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--ci-orange);
+        }
+
+        .logo-text {
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* User Dropdown */
+        .user-dropdown {
+            position: relative;
+        }
+
+        .user-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .user-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--ci-light-gray);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--ci-orange);
+            font-weight: bold;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 120%;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            width: 250px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1001;
+        }
+
+        .dropdown-menu.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--ci-light-gray);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .dropdown-header .user-avatar {
+            width: 48px;
+            height: 48px;
+            font-size: 1.2rem;
+        }
+
+        .dropdown-user-info h4 {
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .dropdown-user-info p {
+            font-size: 0.8rem;
+            color: var(--ci-gray);
+        }
+
+        .dropdown-menu ul {
+            list-style: none;
+        }
+
+        .dropdown-menu li {
+            border-bottom: 1px solid var(--ci-light-gray);
+        }
+
+        .dropdown-menu a {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: var(--ci-dark);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-menu a:hover {
+            background: var(--ci-light-gray);
+            padding-left: 1.25rem;
+        }
+
+        .dropdown-menu i {
+            width: 20px;
+            text-align: center;
+            color: var(--ci-gray);
+        }
+
+        /* Main Content Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            margin-top: 60px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: white;
+            box-shadow: var(--shadow);
+            height: calc(100vh - 60px);
+            position: fixed;
+            left: 0;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            z-index: 999;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 1.5rem 0;
+        }
+
+        .sidebar-menu li {
+            position: relative;
+        }
+
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.8rem 1.5rem;
+            color: var(--ci-dark);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background: linear-gradient(90deg, rgba(255,140,0,0.1), rgba(0,176,79,0.1));
+            border-left-color: var(--ci-orange);
+            color: var(--ci-green);
+        }
+
+        .sidebar-menu i {
+            width: 24px;
+            text-align: center;
+        }
+
+        .sidebar-divider {
+            height: 1px;
+            background: var(--ci-light-gray);
+            margin: 1rem 1.5rem;
+        }
+
+        .sidebar-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--ci-gray);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .submenu {
+            margin-left: 2rem;
+            display: none;
+            list-style: none;
+        }
+
+        .submenu a {
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .has-submenu > a::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-left: auto;
+            font-size: 0.8rem;
+            transition: transform 0.3s ease;
+        }
+
+        .has-submenu.expanded > a::after {
+            transform: rotate(180deg);
+        }
+
+        .has-submenu.expanded .submenu {
+            display: block;
+        }
+
+        /* Main Content Area */
+        .content-area {
+            flex: 1;
+            margin-left: 280px;
+            padding: 1.5rem;
+            transition: margin-left 0.3s ease;
+            min-height: calc(100vh - 60px);
+        }
+
+        /* System Settings Section (Bottom of Sidebar) */
+        .system-settings {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--ci-light-gray);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .content-area {
+                margin-left: 0;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .user-name {
+                display: none;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .content-area {
+                padding: 1rem;
+            }
+            
+            .dropdown-menu {
+                width: 200px;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--ci-light-gray);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--ci-orange), var(--ci-green));
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="top-navbar">
+        <div class="logo-container">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="logo-icon">CI</div>
+            <div class="logo-text">HRMIS</div>
+        </div>
+        
+        <!-- User Dropdown -->
+        <div class="user-dropdown">
+            <div class="user-btn" id="userBtn">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <span class="user-name">Admin User</span>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            
+            <div class="dropdown-menu" id="dropdownMenu">
+                <div class="dropdown-header">
+                    <div class="user-avatar">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <div class="dropdown-user-info">
+                        <h4>Admin User</h4>
+                        <p>Administrateur Système</p>
+                    </div>
+                </div>
+                <ul>
+                    <li><a href="#"><i class="fas fa-user-circle"></i> Mon Profil</a></li>
+                    <li><a href="#"><i class="fas fa-cog"></i> Paramètres</a></li>
+                    <li><a href="#"><i class="fas fa-bell"></i> Notifications</a></li>
+                    <li><a href="#"><i class="fas fa-question-circle"></i> Aide</a></li>
+                </ul>
+                <div class="sidebar-divider"></div>
+                <ul>
+                    <li><a href="#"><i class="fas fa-sign-out-alt"></i> Déconnexion</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Layout -->
+    <div class="main-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <ul class="sidebar-menu">
+                <li><a href="#" class="active">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Tableau de Bord</span>
+                </a></li>
+                
+                <li class="has-submenu">
+                    <a href="#">
+                        <i class="fas fa-users"></i>
+                        <span>Gestion des Employés</span>
+                    </a>
+                    <ul class="submenu">
+                        <li><a href="#">Liste des Employés</a></li>
+                        <li><a href="#">Ajouter Employé</a></li>
+                        <li><a href="#">Départements</a></li>
+                        <li><a href="#">Grades</a></li>
+                    </ul>
+                </li>
+
+                <li class="has-submenu">
+                    <a href="#">
+                        <i class="fas fa-clock"></i>
+                        <span>Présence</span>
+                    </a>
+                    <ul class="submenu">
+                        <li><a href="#">Registre de Présence</a></li>
+                        <li><a href="#">Statistiques</a></li>
+                    </ul>
+                </li>
+
+                <li class="has-submenu">
+                    <a href="#">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Congés</span>
+                    </a>
+                    <ul class="submenu">
+                        <li><a href="#">Demandes de Congé</a></li>
+                        <li><a href="#">Calendrier</a></li>
+                    </ul>
+                </li>
+
+                <li class="has-submenu">
+                    <a href="#">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Situations Admin.</span>
+                    </a>
+                    <ul class="submenu">
+                        <li><a href="#">Situations Actuelles</a></li>
+                        <li><a href="#">Historique</a></li>
+                    </ul>
+                </li>
+
+                <li><a href="#">
+                    <i class="fas fa-money-check"></i>
+                    <span>Paie</span>
+                </a></li>
+
+                <li><a href="#">
+                    <i class="fas fa-folder"></i>
+                    <span>Documents</span>
+                </a></li>
+
+                <li><a href="#">
+                    <i class="fas fa-bell"></i>
+                    <span>Notifications</span>
+                    <span class="notification-badge">3</span>
+                </a></li>
+
+                <!-- System Settings Section (Bottom) -->
+                <div class="system-settings">
+                    <div class="sidebar-title">Administration</div>
+                    <li class="has-submenu">
+                        <a href="#">
+                            <i class="fas fa-cogs"></i>
+                            <span>Paramètres Système</span>
+                        </a>
+                        <ul class="submenu">
+                            <li><a href="#">Gestion des Utilisateurs</a></li>
+                            <li><a href="#">Journal d'Audit</a></li>
+                            <li><a href="#">Param. Notifications</a></li>
+                            <li><a href="#">Mon Profil</a></li>
+                            <li><a href="#">Déconnexion</a></li>
+                        </ul>
+                    </li>
+                </div>
+            </ul>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area" id="contentArea">
+            {% block content %}
+            <!-- Content will be injected here by child templates -->
+            <div class="welcome-message">
+                <h1>Bienvenue sur HRMIS</h1>
+                <p>Système de Gestion des Ressources Humaines de la République de Côte d'Ivoire</p>
+            </div>
+            {% endblock %}
+        </main>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+        });
+
+        // User dropdown toggle
+        const userBtn = document.getElementById('userBtn');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        
+        userBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('active');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+            dropdownMenu.classList.remove('active');
+        });
+
+        // Prevent dropdown from closing when clicking inside
+        dropdownMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Submenu toggle
+        const hasSubmenus = document.querySelectorAll('.has-submenu > a');
+        
+        hasSubmenus.forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (this.parentElement.classList.contains('has-submenu')) {
+                    e.preventDefault();
+                    this.parentElement.classList.toggle('expanded');
+                    
+                    // Close other open submenus
+                    hasSubmenus.forEach(otherItem => {
+                        if (otherItem !== this && otherItem.parentElement.classList.contains('expanded')) {
+                            otherItem.parentElement.classList.remove('expanded');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Responsive adjustments
+        function handleResize() {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('active');
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+    </script>
+</body>
+</html>
+
+
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HRMIS - République de Côte d'Ivoire{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/create_employee.css' %}">
+    <style>
+        :root {
+            --ci-orange: #FF8C00;
+            --ci-white: #FFFFFF;
+            --ci-green: #00B04F;
+            --ci-dark: #1a1a1a;
+            --ci-gray: #6c757d;
+            --ci-light-gray: #f8f9fa;
+            --ci-dark-gray: #343a40;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--ci-orange) 0%, var(--ci-white) 50%, var(--ci-green) 100%);
+            color: var(--ci-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation Bar */
+        .top-navbar {
+            background: linear-gradient(90deg, var(--ci-orange), var(--ci-green));
+            color: white;
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-lg);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            height: 60px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--ci-orange);
+        }
+
+        .logo-text {
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* User Dropdown */
+        .user-dropdown {
+            position: relative;
+        }
+
+        .user-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .user-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--ci-light-gray);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--ci-orange);
+            font-weight: bold;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 120%;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            width: 250px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1001;
+        }
+
+        .dropdown-menu.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--ci-light-gray);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .dropdown-header .user-avatar {
+            width: 48px;
+            height: 48px;
+            font-size: 1.2rem;
+        }
+
+        .dropdown-user-info h4 {
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .dropdown-user-info p {
+            font-size: 0.8rem;
+            color: var(--ci-gray);
+        }
+
+        .dropdown-menu ul {
+            list-style: none;
+        }
+
+        .dropdown-menu li {
+            border-bottom: 1px solid var(--ci-light-gray);
+        }
+
+        .dropdown-menu a {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: var(--ci-dark);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-menu a:hover {
+            background: var(--ci-light-gray);
+            padding-left: 1.25rem;
+        }
+
+        .dropdown-menu i {
+            width: 20px;
+            text-align: center;
+            color: var(--ci-gray);
+        }
+
+        /* Main Content Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            margin-top: 60px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: white;
+            box-shadow: var(--shadow);
+            height: calc(100vh - 60px);
+            position: fixed;
+            left: 0;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            z-index: 999;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 1.5rem 0;
+        }
+
+        .sidebar-menu li {
+            position: relative;
+        }
+
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.8rem 1.5rem;
+            color: var(--ci-dark);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background: linear-gradient(90deg, rgba(255,140,0,0.1), rgba(0,176,79,0.1));
+            border-left-color: var(--ci-orange);
+            color: var(--ci-green);
+        }
+
+        .sidebar-menu i {
+            width: 24px;
+            text-align: center;
+        }
+
+        .sidebar-divider {
+            height: 1px;
+            background: var(--ci-light-gray);
+            margin: 1rem 1.5rem;
+        }
+
+        .sidebar-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--ci-gray);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .submenu {
+            margin-left: 2rem;
+            display: none;
+            list-style: none;
+        }
+
+        .submenu a {
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .has-submenu > a::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-left: auto;
+            font-size: 0.8rem;
+            transition: transform 0.3s ease;
+        }
+
+        .has-submenu.expanded > a::after {
+            transform: rotate(180deg);
+        }
+
+        .has-submenu.expanded .submenu {
+            display: block;
+        }
+
+        /* Main Content Area */
+        .content-area {
+            flex: 1;
+            margin-left: 280px;
+            padding: 1.5rem;
+            transition: margin-left 0.3s ease;
+            min-height: calc(100vh - 60px);
+        }
+
+        /* System Settings Section (Bottom of Sidebar) */
+        .system-settings {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--ci-light-gray);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .content-area {
+                margin-left: 0;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .user-name {
+                display: none;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .content-area {
+                padding: 1rem;
+            }
+            
+            .dropdown-menu {
+                width: 200px;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--ci-light-gray);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--ci-orange), var(--ci-green));
+            border-radius: 10px;
+        }
+    </style>
+
+    <style>
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 1rem 2rem;
+            border-radius: 6px;
+            color: var(--ci-white);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            font-size: 0.9rem;
+            animation: slideInToast 0.3s ease-out;
+        }
+        .toast.success { background: var(--ci-green); }
+        .toast.error { background: #dc3545; }
+        @keyframes slideInToast {
+            from { opacity: 0; transform: translateX(100%); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="top-navbar">
+        <div class="logo-container">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="logo-icon">CI</div>
+            <div class="logo-text">HRMIS</div>
+        </div>
+        
+        <!-- User Dropdown -->
+        {% if user.is_authenticated %}
+            <div class="user-dropdown">
+                <div class="user-btn" id="userBtn">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span class="user-name">{{ user.username }}</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <div class="dropdown-header">
+                        <div class="user-avatar">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="dropdown-user-info">
+                            <h4 style="color: var(--ci-orange);">{{ user.username }}</h4>
+                            <p>{{ user.role|default:"Utilisateur" }}</p>
+                        </div>
+                    </div>
+                    <ul>
+                        <li><a href="{% url 'profile' %}"><i class="fas fa-user-circle"></i> Mon Profil</a></li>
+                        <li><a href="{% url 'settings' %}"><i class="fas fa-cog"></i> Paramètres</a></li>
+                        <li><a href="{% url 'notification_list' %}"><i class="fas fa-bell"></i> Notifications</a></li>
+                        <li><a href="{% url 'help' %}"><i class="fas fa-question-circle"></i> Aide</a></li>
+                    </ul>
+                    <div class="sidebar-divider"></div>
+                    <ul>
+                        <li><a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i> Déconnexion</a></li>
+                    </ul>
+                </div>
+            </div>
+        {% else %}
+            <div class="user-dropdown">
+                <a href="{% url 'login' %}" class="bg-ci-orange text-ci-white px-4 py-2 rounded hover:bg-orange-600">
+                    Connexion
+                </a>
+                <a href="{% url 'register' %}" class="bg-ci-green text-ci-white px-4 py-2 rounded hover:bg-green-600 ml-2">
+                    Inscription
+                </a>
+            </div>
+        {% endif %}
+    </nav>
+
+    <!-- Main Content Layout -->
+    <div class="main-container">
+        <!-- Sidebar Navigation -->
+        {% if user.is_authenticated %}
+            <aside class="sidebar" id="sidebar">
+                <ul class="sidebar-menu">
+                    <li><a href="{% url 'home' %}" class="{% if request.path == '/' %}active{% endif %}">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Tableau de Bord</span>
+                    </a></li>
+                    
+                    <li class="has-submenu">
+                        <a href="#">
+                            <i class="fas fa-users"></i>
+                            <span>Gestion des Employés</span>
+                        </a>
+                        <ul class="submenu">
+                            <li><a href="{% url 'employee_list' %}">Liste des Employés</a></li>
+                            {% if user.role in 'ADMIN,HR' %}
+                                <li><a href="{% url 'employee_create' %}">Ajouter Employé</a></li>
+                                <li><a href="{% url 'department_list' %}">Départements</a></li>
+                                <li><a href="{% url 'department_create' %}">Ajouter Departement</a></li>
+                                <li><a href="{% url 'grade_list' %}">Grades</a></li>
+                                <li><a href="{% url 'grade_create' %}">Ajouter Grade</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+
+                    <li class="has-submenu">
+                        <a href="#">
+                            <i class="fas fa-clock"></i>
+                            <span>Présence</span>
+                        </a>
+                        <ul class="submenu">
+                            <li><a href="{% url 'attendance_list' %}">Registre de Présence</a></li>
+                            {% if user.role in 'ADMIN,HR' %}
+                                <li><a href="{% url 'attendance_stats' %}">Statistiques</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+
+                    <li class="has-submenu">
+                        <a href="#">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>Congés</span>
+                        </a>
+                        <ul class="submenu">
+                            <li><a href="{% url 'leave_list' %}">Demandes de Congé</a></li>
+                            <li><a href="{% url 'leave_calendar' %}">Calendrier</a></li>
+                        </ul>
+                    </li>
+
+                    <li class="has-submenu">
+                        <a href="#">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Situations Admin.</span>
+                        </a>
+                        <ul class="submenu">
+                            <li><a href="{% url 'situation_list' %}">Situations Actuelles</a></li>
+                            <li><a href="{% url 'situation_history' %}">Historique</a></li>
+                        </ul>
+                    </li>
+
+                    <li><a href="{% url 'payroll_list' %}">
+                        <i class="fas fa-money-check"></i>
+                        <span>Paie</span>
+                    </a></li>
+
+                    <li><a href="{% url 'document_list' %}">
+                        <i class="fas fa-folder"></i>
+                        <span>Documents</span>
+                    </a></li>
+
+                    <li><a href="{% url 'notification_list' %}">
+                        <i class="fas fa-bell"></i>
+                        <span>Notifications</span>
+                        {% if notifications_count %}
+                            <span class="notification-badge">{{ notifications_count }}</span>
+                        {% endif %}
+                    </a></li>
+
+                    <!-- System Settings Section (Bottom) -->
+                    {% if user.role in 'ADMIN,HR' %}
+                        <div class="system-settings">
+                            <div class="sidebar-title">Administration</div>
+                            <li class="has-submenu">
+                                <a href="#">
+                                    <i class="fas fa-cogs"></i>
+                                    <span>Paramètres Système</span>
+                                </a>
+                                <ul class="submenu">
+                                    <li><a href="{% url 'user_management' %}">Gestion des Utilisateurs</a></li>
+                                    <li><a href="{% url 'audit_log_list' %}">Journal d'Audit</a></li>
+                                    <li><a href="{% url 'notification_settings' %}">Param. Notifications</a></li>
+                                    <li><a href="{% url 'profile' %}">Mon Profil</a></li>
+                                    <li><a href="{% url 'logout' %}">Déconnexion</a></li>
+                                </ul>
+                            </li>
+                        </div>
+                    {% endif %}
+                </ul>
+            </aside>
+        {% endif %}
+
+        <!-- Main Content Area -->
+        <main class="content-area" id="contentArea">
+            {% block content %}
+                <!-- Content will be injected here by child templates -->
+                <div class="welcome-message">
+                    <h1>Bienvenue sur HRMIS</h1>
+                    <p>Système de Gestion des Ressources Humaines de la République de Côte d'Ivoire</p>
+                </div>
+            {% endblock %}
+        </main>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+        });
+
+        // User dropdown toggle
+        const userBtn = document.getElementById('userBtn');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        
+        userBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('active');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+            dropdownMenu.classList.remove('active');
+        });
+
+        // Prevent dropdown from closing when clicking inside
+        dropdownMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Submenu toggle
+        const hasSubmenus = document.querySelectorAll('.has-submenu > a');
+        
+        hasSubmenus.forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (this.parentElement.classList.contains('has-submenu')) {
+                    e.preventDefault();
+                    this.parentElement.classList.toggle('expanded');
+                    
+                    // Close other open submenus
+                    hasSubmenus.forEach(otherItem => {
+                        if (otherItem !== this && otherItem.parentElement.classList.contains('expanded')) {
+                            otherItem.parentElement.classList.remove('expanded');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Responsive adjustments
+        function handleResize() {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('active');
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+    </script>
+
+    <script>
+        // Toast notification function
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Modal functions
+        function showModal(content) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal()">&times;</span>
+                    ${content}
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function closeModal() {
+            const modal = document.querySelector('.modal');
+            if (modal) modal.remove();
+        }
+    </script>
+    
+</body>
+</html>

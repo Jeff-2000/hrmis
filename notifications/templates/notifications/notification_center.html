@@ -1,0 +1,923 @@
+{% extends 'main/base.html' %}
+
+{% comment %} {% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-bell text-blue-600"></i> Centre de Notifications
+    </h1>
+
+    <!-- Notification Preferences -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">Préférences de Notification</h2>
+            <button id="togglePrefForm" class="btn bg-blue-500 hover:bg-blue-600 text-white">Ajouter Préférence</button>
+        </div>
+        <form id="notificationPrefForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+            <input type="hidden" name="pref_id" id="prefId">
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Canal</span></label>
+                <select name="channel" id="channelSelect" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                    <option value="EMAIL">Email</option>
+                    <option value="SMS">SMS</option>
+                    <option value="WHATSAPP">WhatsApp</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Contact</span></label>
+                <input type="text" name="contact" id="contactInput" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" placeholder="Email ou numéro de téléphone" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Actif</span></label>
+                <input type="checkbox" name="is_active" class="checkbox checkbox-primary" checked>
+            </div>
+            <div class="form-control flex gap-2">
+                <button type="submit" class="btn bg-blue-500 hover:bg-blue-600 text-white mt-4">Enregistrer</button>
+                <button type="button" id="cancelEdit" class="btn bg-gray-500 hover:bg-gray-600 text-white mt-4 hidden">Annuler</button>
+            </div>
+        </form>
+        <div id="prefTable" class="mt-4"></div>
+    </div>
+
+    <!-- Notifications -->
+    <div>
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Mes Notifications</h2>
+        <table class="w-full bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-3 px-4 text-left text-gray-800">Canal</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Message</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Statut</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Date</th>
+                </tr>
+            </thead>
+            <tbody id="notificationTable"></tbody>
+        </table>
+        <div id="pagination" class="flex justify-between items-center p-4">
+            <div>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" disabled>Précédent</button>
+                <span id="pageInfo" class="text-gray-600"></span>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage">Suivant</button>
+            </div>
+            <select id="pageSize" class="select select-bordered border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+
+<!-- Modal overlay -->
+<div id="deleteConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-sm backdrop-saturate-150 hidden">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 z-60">
+    <h2 class="text-lg font-semibold mb-4 text-gray-800">Confirmation</h2>
+    <p class="text-gray-700 mb-6">Voulez-vous vraiment supprimer cette préférence&nbsp;?</p>
+    <div class="flex justify-end gap-2">
+      <button id="cancelDelete" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded">Annuler</button>
+      <button id="confirmDelete" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    // Global namespace for functions accessible to onclick
+    window.Notifications = window.Notifications || {};
+
+    let currentPage = 1;
+    let pageSize = 10;
+    let isEditing = false;
+
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        }
+        return null;
+    }
+
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1"><p class="text-sm font-medium">${message}</p></div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+    
+    
+    function showModal(content) {
+        const modal = document.createElement('div');
+        modal.className = 'modal modal-open';
+        modal.innerHTML = `
+            <div class="modal-box relative bg-white">
+                <button class="btn btn-sm btn-circle absolute right-2 top-2 bg-red-500 backdrop-blur text-white hover:bg-red-600" onclick="this.closest('.modal').classList.remove('modal-open')">✕</button>
+                ${content}
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    function updateContactInput() {
+        const channelSelect = document.getElementById('channelSelect');
+        const contactInput = document.getElementById('contactInput');
+        const channel = channelSelect.value;
+        if (channel === 'EMAIL') {
+            contactInput.type = 'email';
+            contactInput.placeholder = 'Entrez votre email (ex: user@example.com)';
+            contactInput.pattern = '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}';
+        } else {
+            contactInput.type = 'tel';
+            contactInput.placeholder = 'Entrez votre numéro (ex: +1234567890)';
+            contactInput.pattern = '\\+[0-9]{10,15}';
+        }
+        contactInput.focus();
+    }
+
+    async function loadPreferences() {
+        try {
+            const response = await fetch('/api/v1/notifications/preferences/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement des préférences');
+            const data = await response.json();
+            const prefTable = document.getElementById('prefTable');
+            prefTable.innerHTML = `
+                <table class="w-full bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="py-3 px-4 text-left text-gray-800">Canal</th>
+                            <th class="py-3 px-4 text-left text-gray-800">Contact</th>
+                            <th class="py-3 px-4 text-left text-gray-800">Actif</th>
+                            <th class="py-3 px-4 text-left text-gray-800">Créé le</th>
+                            <th class="py-3 px-4 text-left text-gray-800">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.results.map(pref => `
+                            <tr class="border-b border-gray-200">
+                                <td class="py-3 px-4">${pref.channel}</td>
+                                <td class="py-3 px-4">${pref.contact}</td>
+                                <td class="py-3 px-4">${pref.is_active ? 'Oui' : 'Non'}</td>
+                                <td class="py-3 px-4">${new Date(pref.created_at).toLocaleString('fr-FR')}</td>
+                                <td class="py-3 px-4 flex gap-2">
+                                    <button class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white" onclick="Notifications.viewPreference(${pref.id})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm bg-yellow-500 hover:bg-yellow-600 text-white" onclick="Notifications.editPreference(${pref.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm bg-red-500 hover:bg-red-600 text-white" onclick="Notifications.deletePreference(${pref.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="5" class="text-center py-4 text-gray-500">Aucune préférence trouvée.</td></tr>'}
+                    </tbody>
+                </table>
+            `;
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+
+    async function loadNotifications() {
+        const tbody = document.getElementById('notificationTable');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
+        try {
+            const query = new URLSearchParams({
+                page: currentPage,
+                page_size: pageSize
+            }).toString();
+            const response = await fetch(`/api/v1/notifications/notifications/?${query}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            const data = await response.json();
+            const notifications = Array.isArray(data) ? data : data.results || [];
+            const totalCount = data.count || data.total || 0;
+            tbody.innerHTML = notifications.length > 0
+                ? notifications.map(notification => `
+                    <tr class="border-b border-gray-200">
+                        <td class="py-3 px-4">${notification.channel}</td>
+                        <td class="py-3 px-4">${notification.message}</td>
+                        <td class="py-3 px-4">
+                            <span class="badge ${notification.status === 'sent' ? 'bg-green-500' : notification.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500'} text-white">
+                                ${notification.status === 'sent' ? 'Envoyé' : notification.status === 'failed' ? 'Échoué' : 'En attente'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">${new Date(notification.timestamp).toLocaleString('fr-FR')}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="4" class="text-center py-4 text-gray-500">Aucune notification trouvée.</td></tr>';
+            const totalPages = Math.ceil(totalCount / pageSize) || 1;
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-red-500 py-4 text-center">Erreur: ${error.message}</td></tr>`;
+            showToast(`Erreur lors du chargement: ${error.message}`, 'error');
+        }
+    }
+
+    async function savePreference() {
+        const form = document.getElementById('notificationPrefForm');
+        const contactInput = document.getElementById('contactInput');
+        const channel = document.getElementById('channelSelect').value;
+        
+        // Validate input
+        if (channel === 'EMAIL') {
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailRegex.test(contactInput.value)) {
+                showToast('Veuillez entrer une adresse email valide.', 'error');
+                return;
+            }
+        } else {
+            const phoneRegex = /^\+[0-9]{10,15}$/;
+            if (!phoneRegex.test(contactInput.value)) {
+                showToast('Veuillez entrer un numéro de téléphone valide (ex: +1234567890).', 'error');
+                return;
+            }
+        }
+
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        data.is_active = formData.get('is_active') === 'on';
+        const prefId = document.getElementById('prefId').value;
+        const method = prefId ? 'PATCH' : 'POST';
+        const url = prefId ? `/api/v1/notifications/preferences/${prefId}/` : '/api/v1/notifications/preferences/';
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            // if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                let errorMessage = `Erreur API (${response.status})`;
+
+                if (errorData && typeof errorData === 'object') {
+                    // Extract message from {"channel": [...]} or {"detail": "..."}
+                    if (errorData.channel) {
+                        errorMessage = errorData.channel.join(' ');
+                    } else if (errorData.detail) {
+                        errorMessage = errorData.detail;
+                    } else {
+                        // fallback: flatten all messages
+                        errorMessage = Object.values(errorData).flat().join(' ');
+                    }
+                }
+
+                showToast(errorMessage, 'error');
+                return;
+            }
+            showToast(prefId ? 'Préférence modifiée avec succès!' : 'Préférence ajoutée avec succès!', 'success');
+            form.reset();
+            form.classList.add('hidden');
+            document.getElementById('cancelEdit').classList.add('hidden');
+            document.getElementById('togglePrefForm').textContent = 'Ajouter Préférence';
+            isEditing = false;
+            loadPreferences();
+        } catch (error) {
+            showToast(`Erreur lors de l'enregistrement: ${error.message}`, 'error');
+        }
+    }
+
+    Notifications.viewPreference = async function(id) {
+        try {
+            const response = await fetch(`/api/v1/notifications/preferences/${id}/`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement de la préférence');
+            const pref = await response.json();
+            showModal(`
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Détails de la Préférence</h3>
+                <div class="grid grid-cols-1 gap-2">
+                    <div><strong>Canal:</strong> ${pref.channel}</div>
+                    <div><strong>Contact:</strong> ${pref.contact}</div>
+                    <div><strong>Actif:</strong> ${pref.is_active ? 'Oui' : 'Non'}</div>
+                    <div><strong>Créé le:</strong> ${new Date(pref.created_at).toLocaleString('fr-FR')}</div>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button class="btn bg-blue-500 hover:bg-blue-600 text-white" onclick="this.closest('.modal').classList.remove('modal-open')">Fermer</button>
+                </div>
+            `);
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    };
+
+    Notifications.editPreference = async function(id) {
+        try {
+            const response = await fetch(`/api/v1/notifications/preferences/${id}/`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement de la préférence');
+            const pref = await response.json();
+            const form = document.getElementById('notificationPrefForm');
+            const channelSelect = form.querySelector('[name="channel"]');
+            const contactInput = form.querySelector('[name="contact"]');
+            channelSelect.value = pref.channel;
+            contactInput.value = pref.contact;
+            form.querySelector('[name="is_active"]').checked = pref.is_active;
+            document.getElementById('prefId').value = id;
+            form.classList.remove('hidden');
+            document.getElementById('togglePrefForm').textContent = 'Masquer le Formulaire';
+            document.getElementById('cancelEdit').classList.remove('hidden');
+            updateContactInput();
+            isEditing = true;
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    };
+
+    /*
+    Notifications.deletePreference = async function(id) {
+        if (!confirm('Voulez-vous vraiment supprimer cette préférence ?')) return;
+        try {
+            const response = await fetch(`/api/v1/notifications/notifications/preferences/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            showToast('Préférence supprimée avec succès!', 'success');
+            loadPreferences();
+        } catch (error) {
+            showToast(`Erreur lors de la suppression: ${error.message}`, 'error');
+        }
+    };
+    */
+
+Notifications.deletePreference = function(id) {
+    const modal = document.getElementById('deleteConfirmModal');
+    const confirmBtn = document.getElementById('confirmDelete');
+    const cancelBtn = document.getElementById('cancelDelete');
+
+    // Show modal
+    modal.classList.remove('hidden');
+
+    // Handle cancellation
+    cancelBtn.onclick = () => {
+        modal.classList.add('hidden');
+    };
+
+    // Handle confirmation
+    confirmBtn.onclick = async () => {
+        modal.classList.add('hidden');
+        try {
+            const response = await fetch(`/api/v1/notifications/notifications/preferences/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            showToast('Préférence supprimée avec succès!', 'success');
+            loadPreferences();
+        } catch (error) {
+            showToast(`Erreur lors de la suppression: ${error.message}`, 'error');
+        }
+    };
+};    
+
+    function changePage(delta) {
+        currentPage += delta;
+        loadNotifications();
+    }
+
+    function updatePageSize() {
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadNotifications();
+    }
+
+    document.getElementById('togglePrefForm').addEventListener('click', () => {
+        const form = document.getElementById('notificationPrefForm');
+        form.classList.toggle('hidden');
+        document.getElementById('togglePrefForm').textContent = form.classList.contains('hidden') ? 'Ajouter Préférence' : 'Masquer le Formulaire';
+        if (!form.classList.contains('hidden') && !isEditing) {
+            form.reset();
+            document.getElementById('prefId').value = '';
+            document.getElementById('cancelEdit').classList.add('hidden');
+            updateContactInput();
+        }
+    });
+
+    document.getElementById('cancelEdit').addEventListener('click', () => {
+        const form = document.getElementById('notificationPrefForm');
+        form.classList.add('hidden');
+        document.getElementById('togglePrefForm').textContent = 'Ajouter Préférence';
+        form.reset();
+        document.getElementById('prefId').value = '';
+        document.getElementById('cancelEdit').classList.add('hidden');
+        isEditing = false;
+    });
+
+    document.getElementById('notificationPrefForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        savePreference();
+    });
+
+    document.getElementById('channelSelect').addEventListener('change', updateContactInput);
+
+    document.getElementById('prevPage').addEventListener('click', () => changePage(-1));
+    document.getElementById('nextPage').addEventListener('click', () => changePage(1));
+    document.getElementById('pageSize').addEventListener('change', updatePageSize);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateContactInput();
+        loadPreferences();
+        loadNotifications();
+    });
+})();
+</script>
+{% endblock %} {% endcomment %}
+
+
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2">
+      <i class="fas fa-bell text-blue-600"></i> Centre de Notifications
+    </h1>
+    <div class="flex items-center gap-3">
+      <span class="text-sm text-gray-600">Non lus:
+        <span id="unreadCount" class="badge bg-red-600 text-white ml-1">0</span>
+      </span>
+      <button id="markAllRead" class="btn btn-sm bg-green-600 hover:bg-green-700 text-white">
+        <i class="fas fa-check-double mr-1"></i> Marquer tout comme lu
+      </button>
+    </div>
+  </div>
+
+  <!-- Notification Preferences -->
+  <div class="mb-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold text-gray-800">Préférences de Notification</h2>
+      <button id="togglePrefForm" class="btn bg-blue-500 hover:bg-blue-600 text-white">Ajouter Préférence</button>
+    </div>
+
+    <form id="notificationPrefForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+      <input type="hidden" name="pref_id" id="prefId">
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold text-gray-800">Canal</span></label>
+        <select name="channel" id="channelSelect" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+          <option value="EMAIL">Email</option>
+          <option value="SMS">SMS</option>
+          <option value="WHATSAPP">WhatsApp</option>
+        </select>
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold text-gray-800">Contact</span></label>
+        <input type="text" name="contact" id="contactInput" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" placeholder="Email ou numéro de téléphone" required>
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold text-gray-800">Actif</span></label>
+        <input type="checkbox" name="is_active" class="checkbox checkbox-primary" checked>
+      </div>
+      <div class="form-control flex gap-2">
+        <button type="submit" class="btn bg-blue-500 hover:bg-blue-600 text-white mt-4">Enregistrer</button>
+        <button type="button" id="cancelEdit" class="btn bg-gray-500 hover:bg-gray-600 text-white mt-4 hidden">Annuler</button>
+      </div>
+    </form>
+    <div id="prefTable" class="mt-4"></div>
+  </div>
+
+  <!-- Notifications -->
+  <div>
+    <div class="flex items-end justify-between mb-2">
+      <h2 class="text-lg font-semibold text-gray-800">Mes Notifications</h2>
+      <div class="flex items-center gap-2">
+        <label class="label"><span class="label-text text-sm text-gray-600">Afficher</span></label>
+        <select id="filterRead" class="select select-bordered bg-white">
+          <option value="">Toutes</option>
+          <option value="false">Non lues</option>
+          <option value="true">Lues</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="py-3 px-4 text-left text-gray-800">Canal</th>
+            <th class="py-3 px-4 text-left text-gray-800">Titre / Aperçu</th>
+            <th class="py-3 px-4 text-left text-gray-800">Statut</th>
+            <th class="py-3 px-4 text-left text-gray-800">Date</th>
+            <th class="py-3 px-4 text-right text-gray-800">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="notificationTable">
+          <tr><td colspan="5" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="pagination" class="flex justify-between items-center p-4">
+      <div>
+        <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" disabled>Précédent</button>
+        <span id="pageInfo" class="text-gray-600"></span>
+        <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage">Suivant</button>
+      </div>
+      <select id="pageSize" class="select select-bordered border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+        <option value="10" selected>10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+
+<!-- Delete Pref Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-sm backdrop-saturate-150 hidden">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 z-60">
+    <h2 class="text-lg font-semibold mb-4 text-gray-800">Confirmation</h2>
+    <p class="text-gray-700 mb-6">Voulez-vous vraiment supprimer cette préférence&nbsp;?</p>
+    <div class="flex justify-end gap-2">
+      <button id="cancelDelete" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded">Annuler</button>
+      <button id="confirmDelete" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Notification Modal -->
+<input type="checkbox" id="viewModalToggle" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-blue-600 max-w-2xl">
+    <h3 id="vTitle" class="text-lg font-semibold text-blue-700">Notification</h3>
+    <div class="text-sm text-gray-600 mt-1" id="vMeta"></div>
+    <div class="divider my-2"></div>
+    <div id="vMessage" class="prose max-w-none whitespace-pre-wrap text-blue-900"></div>
+    <div class="modal-action">
+      <label for="viewModalToggle" class="btn">Fermer</label>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  // Namespace
+  window.Notifications = window.Notifications || {};
+
+  let currentPage = 1;
+  let pageSize = 10;
+  let isEditing = false;
+  let pendingDeletePrefId = null;
+
+  // --- Utils ---
+  function getCsrfToken() {
+    const m = document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : '';
+  }
+  function showToast(message, type='error'){
+    const c = document.getElementById('toastContainer');
+    const map = {
+      error:{bg:'bg-red-100', txt:'text-red-800', border:'border-red-600', icon:'fa-exclamation-circle text-red-600'},
+      success:{bg:'bg-green-100', txt:'text-green-800', border:'border-green-600', icon:'fa-check-circle text-green-600'}
+    };
+    const t = map[type]||map.error;
+    const el = document.createElement('div');
+    el.className = `toast ${t.bg} ${t.txt} border-l-4 ${t.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+    el.innerHTML = `<i class="fas ${t.icon} mt-1 mr-3"></i><div class="flex-1"><p class="text-sm font-medium">${message}</p></div><button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()"><i class="fas fa-times"></i></button>`;
+    c.appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 5000);
+  }
+  const esc = (s)=> (s||'').toString().replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+  const truncate = (s, n=80)=> s && s.length>n ? s.slice(0,n-1)+'…' : (s||'');
+
+  // --- Unread badge (page + global) ---
+  async function refreshUnread(){
+    try{
+      const r = await fetch('/api/v1/notifications/notifications/unread_count/', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      const d = await r.json();
+      const n = d.unread || 0;
+      const local = document.getElementById('unreadCount');
+      if(local) local.textContent = n;
+      const global = document.getElementById('notifBadge');
+      if(global) global.textContent = n ? n : '';
+    }catch(e){ /* silent */ }
+  }
+
+  // --- Preferences (CRUD) ---
+  function updateContactInput(){
+    const channel = document.getElementById('channelSelect').value;
+    const contact = document.getElementById('contactInput');
+    if(channel==='EMAIL'){
+      contact.type='email';
+      contact.placeholder='user@example.com';
+      contact.pattern='[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}';
+    }else{
+      contact.type='tel';
+      contact.placeholder='+1234567890';
+      contact.pattern='\\+[0-9]{10,15}';
+    }
+  }
+
+  async function loadPreferences(){
+    try{
+      const r = await fetch('/api/v1/notifications/preferences/', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      if(!r.ok) throw new Error('Erreur lors du chargement des préférences.');
+      const data = await r.json();
+      const rows = data.results || data || [];
+      document.getElementById('prefTable').innerHTML = `
+        <table class="w-full bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+          <thead><tr class="bg-gray-100">
+            <th class="py-3 px-4 text-left text-gray-800">Canal</th>
+            <th class="py-3 px-4 text-left text-gray-800">Contact</th>
+            <th class="py-3 px-4 text-left text-gray-800">Actif</th>
+            <th class="py-3 px-4 text-left text-gray-800">Créé le</th>
+            <th class="py-3 px-4 text-left text-gray-800">Actions</th>
+          </tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(p=>`
+              <tr class="border-b border-gray-200">
+                <td class="py-3 px-4">${esc(p.channel)}</td>
+                <td class="py-3 px-4">${esc(p.contact)}</td>
+                <td class="py-3 px-4">${p.is_active?'Oui':'Non'}</td>
+                <td class="py-3 px-4">${new Date(p.created_at).toLocaleString('fr-FR')}</td>
+                <td class="py-3 px-4 flex gap-2">
+                  <button class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white" data-pref-view="${p.id}"><i class="fas fa-eye"></i></button>
+                  <button class="btn btn-sm bg-yellow-500 hover:bg-yellow-600 text-white" data-pref-edit="${p.id}"><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-sm bg-red-500 hover:bg-red-600 text-white" data-pref-del="${p.id}"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>`).join('') : `<tr><td colspan="5" class="text-center py-4 text-gray-500">Aucune préférence trouvée.</td></tr>`}
+          </tbody>
+        </table>`;
+      // wire actions
+      document.querySelectorAll('[data-pref-view]').forEach(b=>b.onclick=()=>viewPreference(b.dataset.prefView));
+      document.querySelectorAll('[data-pref-edit]').forEach(b=>b.onclick=()=>editPreference(b.dataset.prefEdit));
+      document.querySelectorAll('[data-pref-del]').forEach(b=>b.onclick=()=>askDeletePref(b.dataset.prefDel));
+    }catch(e){ showToast(e.message); }
+  }
+
+  async function savePreference(){
+    const form = document.getElementById('notificationPrefForm');
+    const channel = document.getElementById('channelSelect').value;
+    const contact = document.getElementById('contactInput').value.trim();
+    // quick validate
+    if(channel==='EMAIL'){
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if(!re.test(contact)) return showToast('Veuillez entrer une adresse email valide.');
+    }else{
+      const re = /^\+[0-9]{10,15}$/;
+      if(!re.test(contact)) return showToast('Numéro invalide. Ex: +1234567890');
+    }
+    const data = {
+      channel, contact,
+      is_active: form.querySelector('[name="is_active"]').checked
+    };
+    const id = document.getElementById('prefId').value;
+    const url = id ? `/api/v1/notifications/preferences/${id}/` : '/api/v1/notifications/preferences/';
+    const method = id ? 'PATCH' : 'POST';
+    const r = await fetch(url, {
+      method, credentials:'same-origin',
+      headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':getCsrfToken(),'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    if(!r.ok){
+      const e = await r.json().catch(()=>({detail:'Erreur'}));
+      return showToast(e.detail || Object.values(e)[0] || 'Erreur');
+    }
+    showToast(id?'Préférence modifiée':'Préférence ajoutée','success');
+    form.reset(); form.classList.add('hidden'); document.getElementById('togglePrefForm').textContent='Ajouter Préférence';
+    isEditing=false; document.getElementById('cancelEdit').classList.add('hidden');
+    loadPreferences();
+  }
+
+  async function viewPreference(id){
+    const r = await fetch(`/api/v1/notifications/preferences/${id}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!r.ok) return showToast('Introuvable');
+    const p = await r.json();
+    const modal = document.createElement('div');
+    modal.className='modal modal-open';
+    modal.innerHTML = `<div class="modal-box relative bg-white">
+      <button class="btn btn-sm btn-circle absolute right-2 top-2 bg-red-500 text-white" onclick="this.closest('.modal').remove()">✕</button>
+      <h3 class="text-lg font-semibold mb-4">Détails de la Préférence</h3>
+      <div class="space-y-2 text-blue-900">
+        <div><b>Canal:</b> ${esc(p.channel)}</div>
+        <div><b>Contact:</b> ${esc(p.contact)}</div>
+        <div><b>Actif:</b> ${p.is_active?'Oui':'Non'}</div>
+        <div><b>Créé le:</b> ${new Date(p.created_at).toLocaleString('fr-FR')}</div>
+      </div>
+      <div class="modal-action"><button class="btn" onclick="this.closest('.modal').remove()">Fermer</button></div>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+  async function editPreference(id){
+    const r = await fetch(`/api/v1/notifications/preferences/${id}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!r.ok) return showToast('Introuvable');
+    const p = await r.json();
+    const f = document.getElementById('notificationPrefForm');
+    f.classList.remove('hidden'); isEditing=true;
+    document.getElementById('togglePrefForm').textContent='Masquer le Formulaire';
+    document.getElementById('cancelEdit').classList.remove('hidden');
+    document.getElementById('prefId').value = p.id;
+    document.getElementById('channelSelect').value = p.channel; updateContactInput();
+    document.getElementById('contactInput').value = p.contact;
+    f.querySelector('[name="is_active"]').checked = !!p.is_active;
+  }
+  function askDeletePref(id){
+    pendingDeletePrefId = id;
+    document.getElementById('deleteConfirmModal').classList.remove('hidden');
+  }
+  async function doDeletePref(){
+    if(!pendingDeletePrefId) return;
+    const r = await fetch(`/api/v1/notifications/preferences/${pendingDeletePrefId}/`, {
+      method:'DELETE', headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':getCsrfToken()}
+    });
+    document.getElementById('deleteConfirmModal').classList.add('hidden');
+    if(!r.ok) return showToast('Suppression impossible');
+    showToast('Préférence supprimée','success');
+    pendingDeletePrefId = null; loadPreferences();
+  }
+
+  // expose for inline onclick (optional)
+  Notifications.editPreference = editPreference;
+  Notifications.viewPreference = viewPreference;
+  Notifications.deletePreference = askDeletePref;
+
+  // --- Notifications list ---
+  function statusPill(s){
+    const map = {
+      pending:'bg-yellow-200 text-yellow-900',
+      queued:'bg-yellow-200 text-yellow-900',
+      sending:'bg-yellow-200 text-yellow-900',
+      sent:'bg-green-200 text-green-900',
+      delivered:'bg-green-600 text-white',
+      read:'bg-gray-300 text-gray-900',
+      failed:'bg-red-200 text-red-900'
+    };
+    const cls = map[(s||'').toLowerCase()] || 'bg-gray-200 text-gray-800';
+    const label = (s||'').toUpperCase()||'—';
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+
+  function rowHtml(n){
+    const isUnread = !n.is_read;
+    const trCls = isUnread ? 'bg-blue-50' : '';
+    const title = n.title || '(Sans titre)';
+    const preview = truncate(n.message||'', 90);
+    const dateStr = new Date(n.timestamp).toLocaleString('fr-FR');
+    return `<tr class="border-b border-gray-200 ${trCls}">
+      <td class="py-3 px-4">${esc(n.channel)}</td>
+      <td class="py-3 px-4">
+        <div class="font-semibold ${isUnread?'text-blue-800':'text-gray-800'}">${esc(title)}</div>
+        <div class="text-sm ${isUnread?'text-blue-700':'text-gray-500'} truncate max-w-[40ch]" title="${esc(n.message)}">${esc(preview)}</div>
+      </td>
+      <td class="py-3 px-4">${statusPill(n.status)}</td>
+      <td class="py-3 px-4">${dateStr}</td>
+      <td class="py-3 px-4 text-right">
+        <button class="btn btn-xs bg-blue-100 hover:bg-blue-200 text-blue-800" data-view="${n.id}">
+          <i class="fas fa-eye mr-1"></i> Voir
+        </button>
+      </td>
+    </tr>`;
+  }
+
+  async function loadNotifications(){
+    const tbody = document.getElementById('notificationTable');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
+    try{
+      const p = new URLSearchParams();
+      p.set('page', currentPage); p.set('page_size', pageSize);
+      const fr = document.getElementById('filterRead').value;
+      if(fr) p.set('is_read', fr);
+      const r = await fetch(`/api/v1/notifications/notifications/?${p.toString()}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      if(!r.ok) throw new Error(`Erreur API (${r.status})`);
+      const data = await r.json();
+      const rows = data.results || data || [];
+      const total = data.count || rows.length;
+      tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') :
+        '<tr><td colspan="5" class="text-center py-4 text-gray-500">Aucune notification trouvée.</td></tr>';
+
+      tbody.querySelectorAll('[data-view]').forEach(b=>{
+        b.addEventListener('click', ()=> openNotification(b.dataset.view));
+      });
+
+      const totalPages = Math.ceil((total||0)/pageSize) || 1;
+      document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+      document.getElementById('prevPage').disabled = currentPage<=1;
+      document.getElementById('nextPage').disabled = currentPage>=totalPages;
+      refreshUnread();
+    }catch(e){
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-600">${esc(e.message||'Erreur')}</td></tr>`;
+    }
+  }
+
+  async function openNotification(id){
+    // load details
+    const r = await fetch(`/api/v1/notifications/notifications/${id}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!r.ok) return showToast('Notification introuvable');
+    const n = await r.json();
+
+    // Fill modal
+    document.getElementById('vTitle').textContent = n.title || `${n.channel} — ${new Date(n.timestamp).toLocaleString('fr-FR')}`;
+    document.getElementById('vMeta').innerHTML = `
+      <span class="mr-2">${statusPill(n.status)}</span>
+      <span class="text-gray-500">Canal: ${esc(n.channel)}</span>
+      ${n.category?`<span class="ml-2 text-gray-500">Catégorie: ${esc(n.category)}</span>`:''}
+    `;
+    document.getElementById('vMessage').textContent = n.message || '';
+
+    // Mark as read (if not yet)
+    if(!n.is_read){
+      await fetch(`/api/v1/notifications/notifications/${id}/mark_read/`, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':getCsrfToken()}});
+      refreshUnread();
+      // refresh list row color
+      loadNotifications();
+    }
+    // open modal
+    document.getElementById('viewModalToggle').checked = true;
+  }
+
+  async function markAllRead(){
+    const r = await fetch('/api/v1/notifications/notifications/mark_all_read/', {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':getCsrfToken()}});
+    if(!r.ok) return showToast('Impossible de marquer tous comme lus');
+    showToast('Toutes les notifications ont été marquées comme lues.','success');
+    refreshUnread(); loadNotifications();
+  }
+
+  // --- Events wiring ---
+  document.getElementById('markAllRead').addEventListener('click', markAllRead);
+  document.getElementById('filterRead').addEventListener('change', ()=>{ currentPage=1; loadNotifications(); });
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(currentPage>1){ currentPage--; loadNotifications(); }});
+  document.getElementById('nextPage').addEventListener('click', ()=>{ currentPage++; loadNotifications(); });
+  document.getElementById('pageSize').addEventListener('change', ()=>{ pageSize=parseInt(document.getElementById('pageSize').value||10,10); currentPage=1; loadNotifications(); });
+
+  document.getElementById('togglePrefForm').addEventListener('click', ()=>{
+    const f=document.getElementById('notificationPrefForm');
+    const btn = document.getElementById('togglePrefForm');
+    f.classList.toggle('hidden');
+    btn.textContent = f.classList.contains('hidden') ? 'Ajouter Préférence' : 'Masquer le Formulaire';
+    if(!f.classList.contains('hidden') && !isEditing){
+      f.reset(); document.getElementById('prefId').value=''; document.getElementById('cancelEdit').classList.add('hidden'); updateContactInput();
+    }
+  });
+  document.getElementById('cancelEdit').addEventListener('click', ()=>{
+    const f=document.getElementById('notificationPrefForm'); f.classList.add('hidden');
+    document.getElementById('togglePrefForm').textContent='Ajouter Préférence';
+    f.reset(); document.getElementById('prefId').value=''; document.getElementById('cancelEdit').classList.add('hidden'); isEditing=false;
+  });
+  document.getElementById('notificationPrefForm').addEventListener('submit', (e)=>{ e.preventDefault(); savePreference(); });
+  document.getElementById('channelSelect').addEventListener('change', updateContactInput);
+
+  document.getElementById('confirmDelete').addEventListener('click', doDeletePref);
+  document.getElementById('cancelDelete').addEventListener('click', ()=> document.getElementById('deleteConfirmModal').classList.add('hidden'));
+
+  // init
+  updateContactInput();
+  loadPreferences();
+  loadNotifications();
+  refreshUnread();
+})();
+</script>
+{% endblock %}
+
+
+

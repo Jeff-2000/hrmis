@@ -1,0 +1,545 @@
+{% comment %} {% load static tailwind_tags %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HRMIS — Gestion RH Moderne</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  {% tailwind_css %}
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
+    .floating-shape{ position:absolute; border-radius:9999px; filter:blur(40px); opacity:.25 }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white text-gray-800">
+
+  <!-- background shapes -->
+  <div class="pointer-events-none absolute inset-0 overflow-hidden">
+    <div class="floating-shape w-[28rem] h-[28rem] bg-blue-300 top-[-6rem] left-[-6rem]"></div>
+    <div class="floating-shape w-[24rem] h-[24rem] bg-orange-300 bottom-[-6rem] right-[-6rem]"></div>
+  </div>
+
+  <!-- nav -->
+  <header class="relative z-10">
+    <nav class="container mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-2xl bg-blue-600 text-white grid place-content-center shadow-lg">
+          <i class="fa-solid fa-user-tie"></i>
+        </div>
+        <span class="font-extrabold text-xl text-blue-700">HRMIS</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/login/" class="btn btn-sm bg-white border border-blue-200 text-blue-700 hover:bg-blue-50">Se connecter</a>
+        <a href="#" class="btn btn-sm bg-blue-600 text-white hover:bg-blue-700">Créer un compte</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- hero -->
+  <section class="relative z-10">
+    <div class="container mx-auto px-6 pt-10 pb-8 md:pt-16 md:pb-16 grid md:grid-cols-2 gap-10 items-center">
+      <div>
+        <h1 class="text-4xl md:text-5xl font-extrabold leading-tight text-blue-900">
+          La suite RH qui <span class="text-orange-600">centralise</span> tout.
+        </h1>
+        <p class="mt-4 text-lg text-gray-600">
+          Congés, paie, dossiers, situations, audit & notifications multicanales — en un seul endroit, sécurisé et performant.
+        </p>
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <a href="/login/" class="btn bg-blue-600 hover:bg-blue-700 text-white">
+            <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Démarrer
+          </a>
+          <a href="#features" class="btn bg-white border border-blue-200 text-blue-700 hover:bg-blue-50">
+            En savoir plus
+          </a>
+        </div>
+        <div class="mt-6 flex items-center gap-4 text-sm text-gray-500">
+          <div class="flex items-center gap-2"><i class="fa-solid fa-shield-halved text-green-600"></i> Sécurisé</div>
+          <div class="flex items-center gap-2"><i class="fa-solid fa-bolt text-yellow-500"></i> Rapide</div>
+          <div class="flex items-center gap-2"><i class="fa-solid fa-cloud text-blue-500"></i> Cloud Ready</div>
+        </div>
+      </div>
+
+      <!-- preview card -->
+      <div class="relative">
+        <div class="absolute -inset-6 rounded-3xl bg-gradient-to-tr from-blue-200 via-white to-orange-200 blur-2xl opacity-70"></div>
+        <div class="relative rounded-3xl border border-blue-100 shadow-2xl bg-white overflow-hidden">
+          <div class="px-5 py-3 border-b bg-gradient-to-r from-blue-50 to-white text-sm text-blue-700">
+            <i class="fa-solid fa-chart-line mr-2"></i> Aperçu du tableau de bord
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Notifications</div>
+                <div class="text-2xl font-bold text-blue-700">12</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Congés en attente</div>
+                <div class="text-2xl font-bold text-orange-600">3</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Paies du mois</div>
+                <div class="text-2xl font-bold text-emerald-600">158</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white col-span-2">
+                <div class="text-xs text-gray-500">Situations actives</div>
+                <div class="text-xl md:text-2xl font-bold text-gray-800">Formation, Détachement, Maladie…</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Audit</div>
+                <div class="text-2xl font-bold text-purple-700">OK</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- features -->
+  <section id="features" class="relative z-10 py-12 md:py-16">
+    <div class="container mx-auto px-6">
+      <h2 class="text-2xl md:text-3xl font-extrabold text-blue-900">Fonctionnalités clés</h2>
+      <div class="mt-8 grid md:grid-cols-3 gap-6">
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-blue-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-plane-departure"></i></div>
+          <h3 class="font-bold text-blue-800">Gestion des congés</h3>
+          <p class="text-gray-600 mt-2">Demandes, validations (manager/HR), équilibre auto & rappels.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-orange-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+          <h3 class="font-bold text-blue-800">Paie & bulletins</h3>
+          <p class="text-gray-600 mt-2">Moteur de paie, composantes, export CSV, PDF, politiques.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-emerald-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-folder-tree"></i></div>
+          <h3 class="font-bold text-blue-800">Dossiers & situations</h3>
+          <p class="text-gray-600 mt-2">Documents liés, types de situations, disponibilités, historique.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-purple-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-shield-halved"></i></div>
+          <h3 class="font-bold text-blue-800">Audit avancé</h3>
+          <p class="text-gray-600 mt-2">Traçabilité des actions, filtres, détails & conformité.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-rose-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-bell"></i></div>
+          <h3 class="font-bold text-blue-800">Notifications multicanales</h3>
+          <p class="text-gray-600 mt-2">Email, SMS, WhatsApp & In-App, suivi lu/non-lu, callbacks.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-slate-700 text-white grid place-content-center mb-4"><i class="fa-solid fa-lock"></i></div>
+          <h3 class="font-bold text-blue-800">Sécurité & rôles</h3>
+          <p class="text-gray-600 mt-2">ADMIN, HR, MANAGER, EMP, AUDITOR — permissions fines.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <footer class="relative z-10 border-t bg-white/70 backdrop-blur">
+    <div class="container mx-auto px-6 py-8 text-sm text-gray-600 flex flex-wrap items-center justify-between gap-4">
+      <div>© <span id="y"></span> HRMIS — Tous droits réservés.</div>
+      <div class="flex items-center gap-4">
+        <a href="/login/" class="hover:underline">Se connecter</a>
+        <a href="#" class="hover:underline">Créer un compte</a>
+        <a href="#features" class="hover:underline">Fonctionnalités</a>
+      </div>
+    </div>
+  </footer>
+
+
+
+    <!-- Begin of Designer Info -->
+    <!-- Floating button -->
+    <button id="designerFab"
+        class="fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-blue-600 text-white shadow-xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
+        aria-label="À propos du concepteur" title="À propos du concepteur">
+        <i class="fa-solid fa-id-badge text-lg"></i>
+    </button>
+
+    <!-- Modal -->
+    <div id="designerModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" data-close="1"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4">
+        <div class="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-blue-100 overflow-hidden animate-[fadeIn_.2s_ease]">
+        <div class="relative h-28 bg-gradient-to-r from-blue-600 via-blue-500 to-orange-500"></div>
+        <button class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white text-gray-700 shadow hover:bg-gray-50"
+                aria-label="Fermer" data-close="1">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="px-6 -mt-12 flex items-end gap-4">
+            <img id="dAvatar" class="w-20 h-20 rounded-2xl ring-4 ring-white object-cover shadow-lg z-10" alt="Avatar">
+            <div class="pb-2">
+            <div id="dName" class="relative text-xl font-extrabold text-white z-20"></div>
+
+            <div id="dTitle" class="text-sm text-blue-700/80"></div>
+            </div>
+        </div>
+
+        <div class="px-6 pt-4 text-gray-700">
+            <p id="dBio" class="leading-relaxed"></p>
+            <div class="mt-4 grid sm:grid-cols-2 gap-3 text-sm">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-envelope text-blue-600"></i><a id="dEmail" class="hover:underline break-all"></a></div>
+            <div class="flex items-center gap-2"><i class="fa-solid fa-phone text-blue-600"></i><a id="dPhone" class="hover:underline"></a></div>
+            <div class="flex items-center gap-2"><i class="fa-solid fa-globe text-blue-600"></i><a id="dWebsite" class="hover:underline break-all" target="_blank" rel="noopener"></a></div>
+            </div>
+
+            <div class="mt-5">
+            <div class="text-xs uppercase font-semibold text-gray-500 tracking-wider mb-2">Réseaux</div>
+            <div class="flex flex-wrap gap-3">
+                <a id="sLinkedin" target="_blank" rel="noopener" class="icon-btn" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
+                <a id="sGithub" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+                <a id="sX" target="_blank" rel="noopener" class="icon-btn" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+                <a id="sFacebook" target="_blank" rel="noopener" class="icon-btn" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+                <a id="sInstagram" target="_blank" rel="noopener" class="icon-btn" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+                <a id="sWhatsapp" target="_blank" rel="noopener" class="icon-btn" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+                <a id="sEmail" class="icon-btn" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+            </div>
+            </div>
+
+            <div class="px-1 py-5 text-xs text-gray-500">
+            Conçu avec ❤️ pour moderniser la GRH.
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Designer Info Widget (global) -->
+    <script>
+        // --- Customize me ---
+        window.DESIGNER_INFO = {
+            name: "Jeff Pierre",
+            title: "Concepteur & Développeur du système",
+            email: "jeffpierre720@gmail.com",
+            phone: "+2250700000000",
+            website: "https://votre-domaine.com",
+            avatar: "{% static 'img/designer-avatar.jpg' %}",   // put your photo in static files
+            bio: " Jeff Pierre is a statistician and data scientist with expertise in analytics, modeling, and economic research. He holds a MicroMasters in Statistics and Data Science from MITx and has worked on projects in geospatial analysis, predictive modeling, finance, and NLP. Skilled in Python, R, and SQL, Jeff is passionate about applying data to public policy and innovation, and he actively contributes to tech and AI communities.",
+            socials: {
+            linkedin: "https://www.linkedin.com/in/votre-profil/",
+            github: "https://github.com/votre-profil",
+            x: "https://x.com/votre-profil",
+            facebook: "https://facebook.com/votre.profil",
+            instagram: "https://instagram.com/votre.profil",
+            whatsapp: "https://wa.me/2250700000000",
+            email: "mailto:jeffpierre720@gmail.com"
+            }
+        };
+    </script>
+
+    <style>
+        .icon-btn{ @apply w-10 h-10 grid place-content-center rounded-full border border-blue-200 text-blue-700 bg-white hover:bg-blue-50; }
+        @keyframes fadeIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+    </style>
+
+    <script>
+        (function(){
+            const cfg = window.DESIGNER_INFO || {};
+            const $ = (id)=>document.getElementById(id);
+
+            // Fill content
+            $("dAvatar").src      = cfg.avatar || "https://ui-avatars.com/api/?name="+encodeURIComponent(cfg.name||"Designer")+"&background=2563eb&color=fff";
+            $("dName").textContent= cfg.name || "Designer";
+            $("dTitle").textContent= cfg.title || "";
+            $("dBio").textContent = cfg.bio || "";
+            $("dEmail").textContent = cfg.email || ""; $("dEmail").href = cfg.socials?.email || (cfg.email ? "mailto:"+cfg.email : "#");
+            $("dPhone").textContent = cfg.phone || ""; $("dPhone").href = cfg.phone ? "tel:"+cfg.phone : "#";
+            $("dWebsite").textContent = cfg.website || ""; $("dWebsite").href = cfg.website || "#";
+
+            const link = (id, key) => { const el=$(id); const url=cfg.socials?.[key]; if(url){ el.href=url; } else { el.classList.add("pointer-events-none","opacity-40"); } };
+            link("sLinkedin","linkedin"); link("sGithub","github"); link("sX","x");
+            link("sFacebook","facebook"); link("sInstagram","instagram"); link("sWhatsapp","whatsapp"); link("sEmail","email");
+
+            const fab = $("designerFab"), modal = $("designerModal");
+            const open = ()=>{ modal.classList.remove("hidden"); modal.setAttribute("aria-hidden","false"); };
+            const close = ()=>{ modal.classList.add("hidden"); modal.setAttribute("aria-hidden","true"); };
+
+            fab.addEventListener("click", open);
+            modal.addEventListener("click", (e)=>{ if(e.target.dataset.close) close(); });
+            document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") close(); });
+        })();
+    </script>
+    <!-- Done Designer Info -->
+
+  <script>document.getElementById('y').textContent = new Date().getFullYear()</script>
+</body>
+</html> {% endcomment %}
+
+{% load static tailwind_tags %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HRMIS — Gestion RH Moderne</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  {% tailwind_css %}
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
+    .floating-shape{ position:absolute; border-radius:9999px; filter:blur(40px); opacity:.25 }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-orange-50 via-white to-green-50 text-gray-800">
+
+  <!-- background shapes -->
+  <div class="pointer-events-none absolute inset-0 overflow-hidden">
+    <div class="floating-shape w-[28rem] h-[28rem] bg-orange-300 top-[-6rem] left-[-6rem]"></div>
+    <div class="floating-shape w-[24rem] h-[24rem] bg-green-300 bottom-[-6rem] right-[-6rem]"></div>
+  </div>
+
+  <!-- nav -->
+  <header class="relative z-10">
+    <nav class="container mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-2xl bg-orange-600 text-white grid place-content-center shadow-lg">
+          <i class="fa-solid fa-user-tie"></i>
+        </div>
+        <span class="font-extrabold text-xl text-orange-700">HRMIS</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/login/" class="btn btn-sm bg-white border border-orange-200 text-orange-700 hover:bg-orange-50">Se connecter</a>
+        <a href="#" class="btn btn-sm bg-orange-600 text-white hover:bg-orange-700">Créer un compte</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- hero -->
+  <section class="relative z-10">
+    <div class="container mx-auto px-6 pt-10 pb-8 md:pt-16 md:pb-16 grid md:grid-cols-2 gap-10 items-center">
+      <div>
+        <h1 class="text-4xl md:text-5xl font-extrabold leading-tight text-orange-900">
+          La suite RH qui <span class="text-green-600">centralise</span> tout.
+        </h1>
+        <p class="mt-4 text-lg text-gray-600">
+          Congés, paie, dossiers, situations, audit & notifications multicanales — en un seul endroit, sécurisé et performant.
+        </p>
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <a href="/login/" class="btn bg-orange-600 hover:bg-orange-700 text-white">
+            <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Démarrer
+          </a>
+          <a href="#features" class="btn bg-white border border-orange-200 text-orange-700 hover:bg-orange-50">
+            En savoir plus
+          </a>
+        </div>
+        <div class="mt-6 flex items-center gap-4 text-sm text-gray-500">
+          <div class="flex items-center gap-2"><i class="fa-solid fa-shield-halved text-green-600"></i> Sécurisé</div>
+          <div class="flex items-center gap-2"><i class="fa-solid fa-bolt text-orange-500"></i> Rapide</div>
+          <div class="flex items-center gap-2"><i class="fa-solid fa-cloud text-green-500"></i> Cloud Ready</div>
+        </div>
+      </div>
+
+      <!-- preview card -->
+      <div class="relative">
+        <div class="absolute -inset-6 rounded-3xl bg-gradient-to-tr from-orange-200 via-white to-green-200 blur-2xl opacity-70"></div>
+        <div class="relative rounded-3xl border border-orange-100 shadow-2xl bg-white overflow-hidden">
+          <div class="px-5 py-3 border-b bg-gradient-to-r from-orange-50 to-white text-sm text-orange-700">
+            <i class="fa-solid fa-chart-line mr-2"></i> Aperçu du tableau de bord
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Notifications</div>
+                <div class="text-2xl font-bold text-orange-700">12</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Congés en attente</div>
+                <div class="text-2xl font-bold text-green-600">3</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Paies du mois</div>
+                <div class="text-2xl font-bold text-green-600">158</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white col-span-2">
+                <div class="text-xs text-gray-500">Situations actives</div>
+                <div class="text-xl md:text-2xl font-bold text-gray-800">Formation, Détachement, Maladie…</div>
+              </div>
+              <div class="rounded-xl p-4 border bg-white">
+                <div class="text-xs text-gray-500">Audit</div>
+                <div class="text-2xl font-bold text-orange-700">OK</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- features -->
+  <section id="features" class="relative z-10 py-12 md:py-16">
+    <div class="container mx-auto px-6">
+      <h2 class="text-2xl md:text-3xl font-extrabold text-orange-900">Fonctionnalités clés</h2>
+      <div class="mt-8 grid md:grid-cols-3 gap-6">
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-orange-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-plane-departure"></i></div>
+          <h3 class="font-bold text-orange-800">Gestion des congés</h3>
+          <p class="text-gray-600 mt-2">Demandes, validations (manager/HR), équilibre auto & rappels.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-green-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+          <h3 class="font-bold text-orange-800">Paie & bulletins</h3>
+          <p class="text-gray-600 mt-2">Moteur de paie, composantes, export CSV, PDF, politiques.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-orange-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-folder-tree"></i></div>
+          <h3 class="font-bold text-orange-800">Dossiers & situations</h3>
+          <p class="text-gray-600 mt-2">Documents liés, types de situations, disponibilités, historique.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-green-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-shield-halved"></i></div>
+          <h3 class="font-bold text-orange-800">Audit avancé</h3>
+          <p class="text-gray-600 mt-2">Traçabilité des actions, filtres, détails & conformité.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-orange-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-bell"></i></div>
+          <h3 class="font-bold text-orange-800">Notifications multicanales</h3>
+          <p class="text-gray-600 mt-2">Email, SMS, WhatsApp & In-App, suivi lu/non-lu, callbacks.</p>
+        </div>
+        <div class="rounded-2xl border p-6 bg-white shadow-sm hover:shadow-lg transition">
+          <div class="w-10 h-10 rounded-lg bg-green-600 text-white grid place-content-center mb-4"><i class="fa-solid fa-lock"></i></div>
+          <h3 class="font-bold text-orange-800">Sécurité & rôles</h3>
+          <p class="text-gray-600 mt-2">ADMIN, HR, MANAGER, EMP, AUDITOR — permissions fines.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <footer class="relative z-10 border-t bg-white/70 backdrop-blur">
+    <div class="container mx-auto px-6 py-8 text-sm text-gray-600 flex flex-wrap items-center justify-between gap-4">
+      <div>© <span id="y"></span> HRMIS — Tous droits réservés.</div>
+      <div class="flex items-center gap-4">
+        <a href="/login/" class="hover:underline">Se connecter</a>
+        <a href="#" class="hover:underline">Créer un compte</a>
+        <a href="#features" class="hover:underline">Fonctionnalités</a>
+      </div>
+    </div>
+  </footer>
+
+
+
+    <!-- Begin of Designer Info -->
+    <!-- Floating button -->
+    <button id="designerFab"
+        class="fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-orange-600 text-white shadow-xl hover:bg-orange-700 focus:outline-none focus:ring-4 focus:ring-orange-300"
+        aria-label="À propos du concepteur" title="À propos du concepteur">
+        <i class="fa-solid fa-id-badge text-lg"></i>
+    </button>
+
+    <!-- Modal -->
+    <div id="designerModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" data-close="1"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4">
+        <div class="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-orange-100 overflow-hidden animate-[fadeIn_.2s_ease]">
+        <div class="relative h-28 bg-gradient-to-r from-orange-600 via-orange-500 to-green-500"></div>
+        <button class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white text-gray-700 shadow hover:bg-gray-50"
+                aria-label="Fermer" data-close="1">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="px-6 -mt-12 flex items-end gap-4">
+            <img id="dAvatar" class="w-20 h-20 rounded-2xl ring-4 ring-white object-cover shadow-lg z-10" alt="Avatar">
+            <div class="pb-2">
+            <div id="dName" class="relative text-xl font-extrabold text-white z-20"></div>
+
+            <div id="dTitle" class="text-sm text-orange-700/80"></div>
+            </div>
+        </div>
+
+        <div class="px-6 pt-4 text-gray-700">
+            <p id="dBio" class="leading-relaxed"></p>
+            <div class="mt-4 grid sm:grid-cols-2 gap-3 text-sm">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-envelope text-orange-600"></i><a id="dEmail" class="hover:underline break-all"></a></div>
+            <div class="flex items-center gap-2"><i class="fa-solid fa-phone text-orange-600"></i><a id="dPhone" class="hover:underline"></a></div>
+            <div class="flex items-center gap-2"><i class="fa-solid fa-globe text-orange-600"></i><a id="dWebsite" class="hover:underline break-all" target="_blank" rel="noopener"></a></div>
+            </div>
+
+            <div class="mt-5">
+            <div class="text-xs uppercase font-semibold text-gray-500 tracking-wider mb-2">Réseaux</div>
+            <div class="flex flex-wrap gap-3">
+                <a id="sLinkedin" target="_blank" rel="noopener" class="icon-btn" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
+                <a id="sGithub" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+                <a id="sX" target="_blank" rel="noopener" class="icon-btn" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+                <a id="sFacebook" target="_blank" rel="noopener" class="icon-btn" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+                <a id="sInstagram" target="_blank" rel="noopener" class="icon-btn" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+                <a id="sWhatsapp" target="_blank" rel="noopener" class="icon-btn" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+                <a id="sEmail" class="icon-btn" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+            </div>
+            </div>
+
+            <div class="px-1 py-5 text-xs text-gray-500">
+            Conçu avec ❤️ pour moderniser la GRH.
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Designer Info Widget (global) -->
+    <script>
+        // --- Customize me ---
+        window.DESIGNER_INFO = {
+            name: "Jeff Pierre",
+            title: "Concepteur & Développeur du système",
+            email: "jeffpierre720@gmail.com",
+            phone: "+2250700000000",
+            website: "https://votre-domaine.com",
+            avatar: "{% static 'img/designer-avatar.jpg' %}",   // put your photo in static files
+            bio: " Jeff Pierre is a statistician and data scientist with expertise in analytics, modeling, and economic research. He holds a MicroMasters in Statistics and Data Science from MITx and has worked on projects in geospatial analysis, predictive modeling, finance, and NLP. Skilled in Python, R, and SQL, Jeff is passionate about applying data to public policy and innovation, and he actively contributes to tech and AI communities.",
+            socials: {
+            linkedin: "https://www.linkedin.com/in/votre-profil/",
+            github: "https://github.com/votre-profil",
+            x: "https://x.com/votre-profil",
+            facebook: "https://facebook.com/votre.profil",
+            instagram: "https://instagram.com/votre.profil",
+            whatsapp: "https://wa.me/2250700000000",
+            email: "mailto:jeffpierre720@gmail.com"
+            }
+        };
+    </script>
+
+    <style>
+        .icon-btn{ @apply w-10 h-10 grid place-content-center rounded-full border border-orange-200 text-orange-700 bg-white hover:bg-orange-50; }
+        @keyframes fadeIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+    </style>
+
+    <script>
+        (function(){
+            const cfg = window.DESIGNER_INFO || {};
+            const $ = (id)=>document.getElementById(id);
+
+            // Fill content
+            $("dAvatar").src      = cfg.avatar || "https://ui-avatars.com/api/?name="+encodeURIComponent(cfg.name||"Designer")+"&background=ff7f00&color=fff";
+            $("dName").textContent= cfg.name || "Designer";
+            $("dTitle").textContent= cfg.title || "";
+            $("dBio").textContent = cfg.bio || "";
+            $("dEmail").textContent = cfg.email || ""; $("dEmail").href = cfg.socials?.email || (cfg.email ? "mailto:"+cfg.email : "#");
+            $("dPhone").textContent = cfg.phone || ""; $("dPhone").href = cfg.phone ? "tel:"+cfg.phone : "#";
+            $("dWebsite").textContent = cfg.website || ""; $("dWebsite").href = cfg.website || "#";
+
+            const link = (id, key) => { const el=$(id); const url=cfg.socials?.[key]; if(url){ el.href=url; } else { el.classList.add("pointer-events-none","opacity-40"); } };
+            link("sLinkedin","linkedin"); link("sGithub","github"); link("sX","x");
+            link("sFacebook","facebook"); link("sInstagram","instagram"); link("sWhatsapp","whatsapp"); link("sEmail","email");
+
+            const fab = $("designerFab"), modal = $("designerModal");
+            const open = ()=>{ modal.classList.remove("hidden"); modal.setAttribute("aria-hidden","false"); };
+            const close = ()=>{ modal.classList.add("hidden"); modal.setAttribute("aria-hidden","true"); };
+
+            fab.addEventListener("click", open);
+            modal.addEventListener("click", (e)=>{ if(e.target.dataset.close) close(); });
+            document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") close(); });
+        })();
+    </script>
+    <!-- Done Designer Info -->
+
+  <script>document.getElementById('y').textContent = new Date().getFullYear()</script>
+</body>
+</html>

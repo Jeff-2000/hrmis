@@ -1,0 +1,57 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:14
+    environment:
+      - POSTGRES_DB=hrmis
+      - POSTGRES_USER=hrmis_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  redis:
+    image: redis:6
+    volumes:
+      - redis_data:/data
+  web:
+    build: .
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - .:/code
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DATABASE_URL=postgres://hrmis_user:${POSTGRES_PASSWORD}@db:5432/hrmis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - ...
+  worker:
+    build: .
+    command: celery -A hrmis worker --loglevel=INFO
+    depends_on:
+      - web
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - ...
+  beat:
+    build: .
+    command: celery -A hrmis beat --loglevel=INFO -s /tmp/celerybeat-schedule
+    depends_on:
+      - web
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/static:ro  # if static files are collected to this folder
+    depends_on:
+      - web
+volumes:
+  postgres_data:
+  redis_data:

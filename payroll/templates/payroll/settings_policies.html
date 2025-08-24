@@ -1,0 +1,198 @@
+{% extends 'main/base.html' %}
+{% block title %}Paramètres Paie — Politiques{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2"><i class="fas fa-building"></i> Politiques de Paie</h1>
+        <button id="btnNew" class="btn bg-orange-600 hover:bg-orange-700 text-white"><i class="fas fa-plus mr-2"></i>Nouvelle Politique</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+        <div>
+          <label class="label"><span class="label-text">Pays</span></label>
+          <input id="filterCountry" class="input input-bordered input-sm w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="Code pays (ex: CI)">
+        </div>
+        <div class="md:col-span-3 text-right">
+          <button id="btnReload" class="btn btn-sm bg-green-800">Rafraîchir</button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto mt-4">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap text-blue-600">Nom</th>
+              <th class="whitespace-nowrap text-blue-600">Pays</th>
+              <th class="whitespace-nowrap text-blue-600">Devise</th>
+              <th class="whitespace-nowrap text-blue-600">Proration</th>
+              <th class="whitespace-nowrap text-blue-600">Barème</th>
+              <th class="whitespace-nowrap text-blue-600">Contribs</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"><tr><td colspan="7" class="text-center text-base-content/60">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<input type="checkbox" id="editModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600 max-w-3xl">
+    <h3 class="font-bold text-lg" id="modalTitle">Nouvelle Politique</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+      <div>
+        <label class="label"><span class="label-text">Nom</span></label>
+        <input id="f_name" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" required>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Pays (ISO2)</span></label>
+        <input id="f_country" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="CI" required>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Devise</span></label>
+        <select id="f_currency" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Proration</span></label>
+        <select id="f_proration" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+          <option value="CALENDAR">Jours calendrier</option>
+          <option value="WORKING">Jours ouvrés</option>
+        </select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Barème (Tax Table)</span></label>
+        <select id="f_tax_table" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Schémas de Cotisations (plusieurs)</span></label>
+        <select id="f_contribs" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" multiple size="6"></select>
+        <small class="text-xs text-base-content/70">Ctrl/Cmd+clic pour multisélection</small>
+      </div>
+    </div>
+    <div class="modal-action">
+      <label for="editModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnSave" class="btn bg-orange-600 hover:bg-orange-700 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  function getCsrf(){ const m=document.cookie.match(/csrftoken=([^;]+)/); return m?m[1]:''; }
+  const state={page:1, size:10, country:''}; let cache={currencies:[], tables:[], contribs:[]}; let editId=null;
+
+  async function loadSelects(){
+    const [curr, tabs, cons] = await Promise.all([
+      fetch('/api/v1/currencies/').then(r=>r.json()),
+      fetch('/api/v1/tax-tables/?page_size=999').then(r=>r.json()),
+      fetch('/api/v1/contribs/?page_size=999').then(r=>r.json()),
+    ]);
+    cache.currencies = curr.results||curr||[];
+    cache.tables     = tabs.results||tabs||[];
+    cache.contribs   = cons.results||cons||[];
+    document.getElementById('f_currency').innerHTML = cache.currencies.map(c=>`<option value="${c.code}">${c.code} — ${c.name}</option>`).join('');
+    document.getElementById('f_tax_table').innerHTML = `<option value="">—</option>` + cache.tables.map(t=>`<option value="${t.id}">${t.country} • ${t.valid_from}${t.valid_to?(' → '+t.valid_to):''}</option>`).join('');
+    document.getElementById('f_contribs').innerHTML = cache.contribs.map(c=>`<option value="${c.id}">${c.code} — ${c.name}</option>`).join('');
+  }
+
+  async function load(){
+    const params=new URLSearchParams(); params.set('page',state.page); params.set('page_size',state.size);
+    if (state.country) params.set('country', state.country);
+    const tbody=document.getElementById('tbody'); tbody.innerHTML=`<tr><td colspan="7" class="text-center text-base-content/60">Chargement…</td></tr>`;
+    const r = await fetch(`/api/v1/company-policy/?${params.toString()}`); const data=await r.json(); const rows=data.results||data||[];
+    if (!rows.length){ tbody.innerHTML=`<tr><td colspan="7" class="text-center text-base-gray">Aucune politique</td></tr>`; return; }
+    tbody.innerHTML = rows.map(p=>{
+      const contribCount = (p.active_contribs||[]).length;
+      return `<tr>
+        <td>${p.name}</td>
+        <td>${p.country}</td>
+        <td>${p.currency?.code||''}</td>
+        <td>${p.proration_method}</td>
+        <td>${p.active_tax_table? (p.active_tax_table.country+' '+p.active_tax_table.valid_from):'—'}</td>
+        <td>${contribCount}</td>
+        <td class="text-right">
+          <button class="btn btn-xs" data-edit="${p.id}"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-xs btn-error text-white" data-del="${p.id}"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+    document.getElementById('pageInfo').textContent = data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`;
+
+    tbody.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.edit)));
+    tbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>doDelete(b.dataset.del)));
+  }
+
+  async function openEdit(id){
+    editId = id||null;
+    document.getElementById('modalTitle').textContent = id ? 'Modifier Politique' : 'Nouvelle Politique';
+    // reset
+    document.getElementById('f_name').value=''; document.getElementById('f_country').value='';
+    document.getElementById('f_proration').value='CALENDAR';
+    document.getElementById('f_tax_table').value='';
+    [...document.getElementById('f_contribs').options].forEach(o=>o.selected=false);
+
+    if (id){
+      const p = await fetch(`/api/v1/company-policy/${id}/`).then(r=>r.json());
+      document.getElementById('f_name').value = p.name||'';
+      document.getElementById('f_country').value = p.country||'';
+      document.getElementById('f_currency').value = p.currency?.code || '';
+      document.getElementById('f_proration').value = p.proration_method || 'CALENDAR';
+      if (p.active_tax_table) document.getElementById('f_tax_table').value = p.active_tax_table.id;
+      const ids = (p.active_contribs||[]).map(x=>String(x.id));
+      [...document.getElementById('f_contribs').options].forEach(o=> o.selected = ids.includes(o.value));
+    }
+    document.getElementById('editModal').checked = true;
+  }
+
+  async function doSave(){
+    const payload = {
+      name: document.getElementById('f_name').value.trim(),
+      country: document.getElementById('f_country').value.trim().toUpperCase(),
+      currency_id: document.getElementById('f_currency').value,
+      proration_method: document.getElementById('f_proration').value,
+      active_tax_table_id: document.getElementById('f_tax_table').value || null,
+      active_contribs_ids: [...document.getElementById('f_contribs').selectedOptions].map(o=>o.value)
+    };
+    if (!payload.name || !payload.country || !payload.currency_id){ showToast('Nom, pays et devise sont requis', 'error'); return; }
+    const method = editId ? 'PUT' : 'POST';
+    const url    = editId ? `/api/v1/company-policy/${editId}/` : `/api/v1/company-policy/`;
+    const r = await fetch(url, {
+      method, headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf(),'X-Requested-With':'XMLHttpRequest'},
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok){ const e=await r.json().catch(()=>({detail:'Erreur'})); showToast(e.detail||JSON.stringify(e), 'error'); return; }
+    document.getElementById('editModal').checked=false; showToast('Enregistré', 'success'); load();
+  }
+
+  async function doDelete(id){
+    if (!confirm('Supprimer cette politique ?')) return;
+    const r = await fetch(`/api/v1/company-policy/${id}/`, { method:'DELETE', headers:{'X-CSRFToken':getCsrf()}});
+    if (!r.ok){ showToast('Suppression impossible', 'error'); return; }
+    showToast('Supprimé', 'success'); load();
+  }
+
+  // wiring
+  document.getElementById('btnNew').addEventListener('click', ()=>openEdit(null));
+  document.getElementById('btnSave').addEventListener('click', doSave);
+  document.getElementById('btnReload').addEventListener('click', ()=>{ state.country = document.getElementById('filterCountry').value.trim().toUpperCase(); state.page=1; load(); });
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){state.page--;load();} });
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; load(); });
+
+  loadSelects().then(load);
+})();
+</script>
+{% endblock %}

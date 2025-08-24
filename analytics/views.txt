@@ -1,0 +1,428 @@
+# analytics/views.py
+from __future__ import annotations
+from datetime import date, datetime, timedelta
+from calendar import monthrange
+from collections import defaultdict
+from django.shortcuts import render
+
+from django.db.models import Sum, Count, Q, F
+from django.utils import timezone
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import TemplateView
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from employee.models import Employee
+from leave.models import LeaveRequest
+from payroll.models import Payslip, PayrollRun, PayslipItem
+from notifications.models import Notification
+from payroll.models import Contract  # (you defined it in payroll/models.py)
+
+from .models import AnalyticsCache
+from .cache import *
+from .services import *
+
+#################################################################################
+
+
+#############################################################################
+######################### --- L3: In-memory --- #############################
+# ---------- helpers ----------
+
+def _month_key(dt: date) -> str:
+    return f"{dt.year}-{dt.month:02d}"
+
+def _add_month(d: date, k: int = 1) -> date:
+    y = d.year + (d.month + k - 1) // 12
+    m = (d.month + k - 1) % 12 + 1
+    day = min(d.day, monthrange(y, m)[1])
+    return date(y, m, day)
+
+def _months_range(start: date, end: date):
+    cur = date(start.year, start.month, 1)
+    endm = date(end.year, end.month, 1)
+    while cur <= endm:
+        yield cur
+        cur = _add_month(cur, 1)
+
+def _try_prophet_or_naive(series):
+    """
+    series: list of {'month': 'YYYY-MM', 'value': int}
+    returns same + forecast next n months (default 6)
+    """
+    horizon = 6
+    # Fallback: moving-average forecast
+    if not series:
+        return {"history": [], "forecast": []}
+
+    try:
+        # Optional: Prophet (if installed)
+        from prophet import Prophet  # pip install prophet
+        import pandas as pd
+        df = pd.DataFrame(series)
+        df["ds"] = pd.to_datetime(df["month"] + "-01")
+        df["y"] = df["value"].astype(float)
+        m = Prophet(seasonality_mode="additive")
+        m.fit(df[["ds", "y"]])
+        future = m.make_future_dataframe(periods=horizon, freq="MS")
+        fc = m.predict(future).tail(horizon)
+        out_fc = []
+        for _, r in fc.iterrows():
+            out_fc.append({
+                "month": r["ds"].strftime("%Y-%m"),
+                "value": max(0, float(r["yhat"])),
+                "lower": max(0, float(r.get("yhat_lower", r["yhat"]))),
+                "upper": max(0, float(r.get("yhat_upper", r["yhat"]))),
+            })
+        return {"history": series, "forecast": out_fc}
+    except Exception:
+        # Naive 3-month moving average
+        values = [s["value"] for s in series]
+        last_month = datetime.strptime(series[-1]["month"] + "-01", "%Y-%m-%d").date()
+        fc = []
+        for i in range(1, horizon + 1):
+            if len(values) >= 3:
+                f = sum(values[-3:]) / 3.0
+            else:
+                f = sum(values) / len(values)
+            last_month = _add_month(last_month, 1)
+            values.append(f)
+            fc.append({"month": _month_key(last_month), "value": round(f, 2)})
+        return {"history": series, "forecast": fc}
+
+# ---------- template ----------
+
+class DashboardView(LoginRequiredMixin, TemplateView):
+    template_name = "analytics/dashboard.html"
+
+# ---------- APIs ----------
+
+class KPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        today = timezone.localdate()
+        # Headcount = active contracts today (fallback to Employee.status == 'actif' if no contracts)
+        active_headcount = Contract.objects.filter(
+            start_date__lte=today
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today)
+        ).values("employee_id").distinct().count()
+        if active_headcount == 0:
+            active_headcount = Employee.objects.filter(status__iexact="actif").count()
+
+        # Turnover (exits last 12m): contracts ended in last 12 months
+        twelve_months_ago = today.replace(day=1) - timedelta(days=365)
+        exits = Contract.objects.filter(
+            end_date__gte=twelve_months_ago, end_date__lt=today
+        ).values("employee_id").distinct().count()
+
+        # Payroll this month (sum net pay for latest processed/closed run this month; else latest run)
+        run = PayrollRun.objects.order_by("-year", "-month").first()
+        payroll_net = 0
+        if run:
+            payroll_net = Payslip.objects.filter(run=run).aggregate(s=Sum("net_pay"))["s"] or 0
+
+        # Leave pending
+        leave_pending = LeaveRequest.objects.filter(status="pending").count()
+
+        # Read-rate (last 30d)
+        since = timezone.now() - timedelta(days=30)
+        notif_qs = Notification.objects.filter(timestamp__gte=since)
+        sent = notif_qs.exclude(status__in=["failed"]).count()
+        read = notif_qs.filter(is_read=True).count()
+        read_rate = (read / sent * 100.0) if sent else 0.0
+
+        return Response({
+            "headcount": active_headcount,
+            "turnover_12m": exits,
+            "payroll_latest_total": float(payroll_net),
+            "leave_pending": leave_pending,
+            "read_rate_30d": round(read_rate, 1),
+        })
+
+
+class HeadcountForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        months_back = int(request.query_params.get("months_back", 18))
+        today = timezone.localdate()
+        start = _add_month(date(today.year, today.month, 1), -months_back)
+        end = date(today.year, today.month, 1)
+
+        series = []
+        for m in _months_range(start, end):
+            month_end = date(m.year, m.month, monthrange(m.year, m.month)[1])
+            # contracts active at any day in month → active at month_end & started by month_end
+            c = Contract.objects.filter(start_date__lte=month_end).filter(
+                Q(end_date__isnull=True) | Q(end_date__gte=m.replace(day=1))
+            ).values("employee_id").distinct().count()
+            if c == 0:
+                # fallback to Employees by date_joined
+                c = Employee.objects.filter(date_joined__lte=month_end, status__iexact="actif").count()
+            series.append({"month": f"{m.year}-{m.month:02d}", "value": c})
+
+        return Response(_try_prophet_or_naive(series))
+
+
+class LeaveForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        months_back = int(request.query_params.get("months_back", 18))
+        today = timezone.localdate()
+        start = _add_month(date(today.year, today.month, 1), -months_back)
+        end = date(today.year, today.month, 1)
+
+        # Count requests by start_date month
+        counts = defaultdict(int)
+        qs = LeaveRequest.objects.filter(start_date__gte=start, start_date__lte=end)
+        for lr in qs.values("start_date"):
+            k = f"{lr['start_date'].year}-{lr['start_date'].month:02d}"
+            counts[k] += 1
+        series = [{"month": k, "value": counts[k]} for k in sorted(counts.keys())]
+        return Response(_try_prophet_or_naive(series))
+
+
+class LeaveSLAView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        # Aging for pending, distribution; throughput per status
+        today = timezone.now()
+        pending = LeaveRequest.objects.filter(status="pending")
+        aging = []
+        for x in pending.values("id", "requested_at"):
+            days = (today - x["requested_at"]).days
+            aging.append(days)
+
+        buckets = {"0-2":0, "3-5":0, "6-10":0, "11-20":0, "21+":0}
+        for d in aging:
+            if d <= 2: buckets["0-2"] += 1
+            elif d <= 5: buckets["3-5"] += 1
+            elif d <= 10: buckets["6-10"] += 1
+            elif d <= 20: buckets["11-20"] += 1
+            else: buckets["21+"] += 1
+
+        status_counts = dict(LeaveRequest.objects.values_list("status").annotate(n=Count("id")))
+        return Response({
+            "pending_age_buckets": buckets,
+            "status_counts": status_counts,
+            "pending_median_age": (sorted(aging)[len(aging)//2] if aging else 0),
+        })
+
+
+class PayrollComponentsView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        # latest run (processed/closed preferred)
+        run = PayrollRun.objects.order_by("-status", "-year", "-month").first()
+        if not run:
+            return Response({"run": None, "components": []})
+
+        items = (PayslipItem.objects
+                 .filter(payslip__run=run)
+                 .values(code=F("component__code"), name=F("component__name"), kind=F("component__kind"))
+                 .annotate(total=Sum("amount"))
+                 .order_by("code"))
+        return Response({
+            "run": {"id": run.id, "year": run.year, "month": run.month, "status": run.status},
+            "components": [{"code": i["code"], "name": i["name"], "kind": i["kind"], "total": float(i["total"] or 0)} for i in items],
+        })
+
+
+class AttritionRiskView(APIView):
+    """
+    Heuristic baseline (no labels): score 0..1 using tenure, recent leave, unread load,
+    and situation flags. Replace later with a trained model once exits are labeled.
+    """
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        today = timezone.localdate()
+        six_months_ago = today - timedelta(days=180)
+        out = []
+        # Compute per-employee features
+        emps = Employee.objects.select_related("department", "grade").all()
+        # Preload counts
+        leave_counts = dict(
+            LeaveRequest.objects.filter(start_date__gte=six_months_ago)
+            .values("employee_id").annotate(n=Count("id")).values_list("employee_id", "n")
+        )
+        unread_counts = dict(
+            Notification.objects.filter(is_read=False)
+            .values("user_id").annotate(n=Count("id")).values_list("user_id", "n")
+        )
+        # basic scaler bounds
+        max_leave = max(leave_counts.values()) if leave_counts else 1
+        max_unread = max(unread_counts.values()) if unread_counts else 1
+
+        for e in emps:
+            # tenure in months
+            dj = e.date_joined or (today - timedelta(days=365))
+            tenure_m = max(1, (today.year - dj.year)*12 + today.month - dj.month)
+            f_tenure = 1 - min(tenure_m / 120.0, 1.0)      # shorter tenure → higher risk
+            f_leave = (leave_counts.get(e.id, 0) / max_leave) if max_leave else 0.0
+            ucount = unread_counts.get(getattr(e, "user_id", None), 0)
+            f_unread = (ucount / max_unread) if max_unread else 0.0
+            # simple weighted sum
+            risk = 0.45*f_tenure + 0.35*f_leave + 0.20*f_unread
+            out.append({
+                "employee": {
+                    "id": str(e.id),
+                    "first_name": e.first_name, "last_name": e.last_name,
+                    "department": getattr(getattr(e, "department", None), "name", None),
+                    "grade": getattr(getattr(e, "grade", None), "code", None),
+                },
+                "score": round(float(risk), 3),
+                "features": {"tenure_score": round(f_tenure,3), "leave6m": leave_counts.get(e.id, 0), "unread": ucount},
+            })
+        # top 20
+        out.sort(key=lambda x: x["score"], reverse=True)
+        return Response({"top": out[:20], "generated_at": timezone.now().isoformat()})
+
+
+class NotificationEngagementView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        since = timezone.now() - timedelta(days=90)
+        qs = Notification.objects.filter(timestamp__gte=since)
+        by_channel = (qs.values("channel")
+                        .annotate(sent=Count("id"),
+                                  read=Sum(1, filter=Q(is_read=True)))
+                        .order_by("channel"))
+        # unread distribution (current snapshot)
+        unread_dist = (Notification.objects.filter(is_read=False)
+                       .values("user__role")
+                       .annotate(n=Count("id")).order_by())
+        return Response({
+            "channels": [
+                {
+                    "channel": r["channel"],
+                    "sent": r["sent"],
+                    "read": int(r["read"] or 0),
+                    "read_rate": round((int(r["read"] or 0) / r["sent"] * 100.0), 1) if r["sent"] else 0.0
+                } for r in by_channel
+            ],
+            "unread_by_role": [{"role": x["user__role"] or "UNKNOWN", "count": x["n"]} for x in unread_dist],
+        })
+
+#############################################################################
+########################### --- L2: DB cache --- #############################
+
+# analytics/views.py (only the changes — keep imports and DashboardView)
+
+class KPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request): return Response(get_or_set("analytics:kpis", compute_kpis, 300))
+
+class HeadcountForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request): return Response(get_or_set("analytics:headcount", compute_headcount_series, 3600))
+
+class LeaveForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request): return Response(get_or_set("analytics:leave_series", compute_leave_series, 3600))
+
+class LeaveSLAView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request): return Response(get_or_set("analytics:leave_sla", compute_leave_sla, 900))
+
+class PayrollComponentsView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request): return Response(get_or_set("analytics:payroll_components", compute_payroll_components, 900))
+
+class AttritionRiskView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request): return Response(get_or_set("analytics:attrition_top", compute_attrition_top, 900))
+
+# NEW: one-call summary endpoint (fixes earlier /api/summary/ error)
+class SummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        return Response({
+            "kpis": get_or_set("analytics:kpis", compute_kpis, 300),
+            "headcount": get_or_set("analytics:headcount", compute_headcount_series, 3600),
+            "leave_series": get_or_set("analytics:leave_series", compute_leave_series, 3600),
+            "leave_sla": get_or_set("analytics:leave_sla", compute_leave_sla, 900),
+            "payroll_components": get_or_set("analytics:payroll_components", compute_payroll_components, 900),
+            "attrition_top": get_or_set("analytics:attrition_top", compute_attrition_top, 900),
+        })
+
+##############################################################################################
+
+
+
+
+
+####################################################################################################
+#####--- L1: Allow bypassing cache and Updating the analytics AP views ---##########################
+
+def _maybe_fresh(request, key, fn, ttl):
+    fresh = request.query_params.get("fresh", "").lower() in ("1","true","yes")
+    if fresh:
+        data = fn()                    # L3 direct compute
+        set_with_source(key, data, ttl)
+        return data, "fresh-compute"
+    return get_or_set_with_source(key, fn, ttl)
+
+class KPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        data, src = _maybe_fresh(request, "analytics:kpis", compute_kpis, 300)
+        resp = Response(data); resp["X-Analytics-Source"] = src; return resp
+
+class HeadcountForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        data, src = _maybe_fresh(request, "analytics:headcount", compute_headcount_series, 3600)
+        resp = Response(data); resp["X-Analytics-Source"] = src; return resp
+
+class LeaveForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        data, src = _maybe_fresh(request, "analytics:leave_series", compute_leave_series, 3600)
+        resp = Response(data); resp["X-Analytics-Source"] = src; return resp
+
+class LeaveSLAView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        data, src = _maybe_fresh(request, "analytics:leave_sla", compute_leave_sla, 900)
+        resp = Response(data); resp["X-Analytics-Source"] = src; return resp
+
+class PayrollComponentsView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        data, src = _maybe_fresh(request, "analytics:payroll_components", compute_payroll_components, 900)
+        resp = Response(data); resp["X-Analytics-Source"] = src; return resp
+
+class AttritionRiskView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        data, src = _maybe_fresh(request, "analytics:attrition_top", compute_attrition_top, 900)
+        resp = Response(data); resp["X-Analytics-Source"] = src; return resp
+
+class SummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        # Mixed loads; each key may come from different source
+        kpis, src_k = _maybe_fresh(request, "analytics:kpis", compute_kpis, 300)
+        hc, src_h  = _maybe_fresh(request, "analytics:headcount", compute_headcount_series, 3600)
+        ls, src_ls = _maybe_fresh(request, "analytics:leave_series", compute_leave_series, 3600)
+        sla, src_s = _maybe_fresh(request, "analytics:leave_sla", compute_leave_sla, 900)
+        pc, src_p  = _maybe_fresh(request, "analytics:payroll_components", compute_payroll_components, 900)
+        ar, src_a  = _maybe_fresh(request, "analytics:attrition_top", compute_attrition_top, 900)
+
+        resp = Response({
+            "kpis": kpis,
+            "headcount": hc,
+            "leave_series": ls,
+            "leave_sla": sla,
+            "payroll_components": pc,
+            "attrition_top": ar,
+            "_sources": {  # optional: expose per-section sources in payload for debugging
+                "kpis": src_k, "headcount": src_h, "leave_series": src_ls,
+                "leave_sla": src_s, "payroll_components": src_p, "attrition_top": src_a
+            }
+        })
+        resp["X-Analytics-Source"] = "mixed"
+        return resp
+    
+#################################################################################

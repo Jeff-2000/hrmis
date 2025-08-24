@@ -1,0 +1,493 @@
+{# templates/analytics/dashboard.html #}
+{% extends "main/base.html" %}
+{% block title %}Analytics — HRMIS{% endblock %}
+
+{% comment %} {% block content %}
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-blue-700 flex items-center gap-2">
+    <i class="fas fa-chart-line"></i> Tableau de bord analytique
+  </h1>
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
+    <div class="card shadow bg-white border-l-4 border-blue-600 p-4">
+      <div class="text-sm text-gray-500">Effectif</div>
+      <div id="kpiHeadcount" class="text-2xl font-semibold text-blue-700">—</div>
+    </div>
+    <div class="card shadow bg-white border-l-4 border-rose-600 p-4">
+      <div class="text-sm text-gray-500">Turnover (12m)</div>
+      <div id="kpiTurnover" class="text-2xl font-semibold text-rose-700">—</div>
+    </div>
+    <div class="card shadow bg-white border-l-4 border-emerald-600 p-4">
+      <div class="text-sm text-gray-500">Paie (dernier run)</div>
+      <div id="kpiPayroll" class="text-2xl font-semibold text-emerald-700">—</div>
+    </div>
+    <div class="card shadow bg-white border-l-4 border-amber-600 p-4">
+      <div class="text-sm text-gray-500">Congés en attente</div>
+      <div id="kpiPending" class="text-2xl font-semibold text-amber-700">—</div>
+    </div>
+    <div class="card shadow bg-white border-l-4 border-indigo-600 p-4">
+      <div class="text-sm text-gray-500">Taux de lecture (30j)</div>
+      <div id="kpiReadRate" class="text-2xl font-semibold text-indigo-700">—</div>
+    </div>
+  </div>
+
+  <!-- Row 1 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="card shadow bg-white p-4">
+      <div class="font-semibold text-blue-700 mb-2">Effectif — historique & prévision</div>
+      <canvas id="chartHeadcount" height="110"></canvas>
+    </div>
+    <div class="card shadow bg-white p-4">
+      <div class="font-semibold text-blue-700 mb-2">Paie — décomposition par composant</div>
+      <canvas id="chartPayroll" height="110"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 2 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="card shadow bg-white p-4">
+      <div class="font-semibold text-blue-700 mb-2">Congés — historique & prévision</div>
+      <canvas id="chartLeave" height="110"></canvas>
+    </div>
+    <div class="card shadow bg-white p-4">
+      <div class="font-semibold text-blue-700 mb-2">SLA des demandes de congé</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <canvas id="chartLeaveAging" height="110"></canvas>
+        <canvas id="chartLeaveStatus" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="card shadow bg-white p-4">
+      <div class="font-semibold text-blue-700 mb-2">Risque d’attrition — top 10</div>
+      <div class="overflow-x-auto">
+        <table class="table w-full">
+          <thead><tr><th>Employé</th><th>Dept</th><th>Grade</th><th class="text-right">Score</th></tr></thead>
+          <tbody id="attritionTable"><tr><td colspan="4" class="text-center py-4 text-gray-500">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card shadow bg-white p-4">
+      <div class="font-semibold text-blue-700 mb-2">Engagement notifications</div>
+      <canvas id="chartNotifChannels" height="110"></canvas>
+      <div class="mt-4">
+        <canvas id="chartUnreadRole" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(async function() {
+  const fmtMoney = n => new Intl.NumberFormat('fr-FR', {style:'currency', currency:'XOF'}).format(n);
+  const GET = async (url) => {
+    const r = await fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!r.ok) throw new Error(url + ' → ' + r.status);
+    return await r.json();
+  };
+
+  // KPIs
+  try {
+    const k = await GET('/api/v1/analytics/kpis/');
+    document.getElementById('kpiHeadcount').textContent = k.headcount;
+    document.getElementById('kpiTurnover').textContent = k.turnover_12m;
+    document.getElementById('kpiPayroll').textContent = fmtMoney(k.payroll_latest_total || 0);
+    document.getElementById('kpiPending').textContent = k.leave_pending;
+    document.getElementById('kpiReadRate').textContent = (k.read_rate_30d||0) + '%';
+  } catch(e) { console.error(e); }
+
+  // Headcount
+  try {
+    const hc = await GET('/api/v1/analytics/headcount_forecast/');
+    const labels = hc.history.map(x=>x.month).concat(hc.forecast.map(x=>x.month));
+    const histVals = hc.history.map(x=>x.value);
+    const fcVals = new Array(hc.history.length).fill(null).concat(hc.forecast.map(x=>x.value));
+    new Chart(document.getElementById('chartHeadcount'), {
+      type:'line',
+      data:{
+        labels,
+        datasets:[
+          {label:'Historique', data:[...histVals, ...new Array(hc.forecast.length).fill(null)]},
+          {label:'Prévision', data:fcVals, borderDash:[6,6]}
+        ]
+      },
+      options:{responsive:true, plugins:{legend:{position:'bottom'}}}
+    });
+  } catch(e){ console.error(e); }
+
+  // Payroll components
+  try {
+    const pc = await GET('/api/v1/analytics/payroll_components/');
+    const labels = pc.components.map(x=>x.code);
+    const data = pc.components.map(x=>x.total);
+    new Chart(document.getElementById('chartPayroll'), {
+      type:'bar',
+      data:{ labels, datasets:[{label:'Montant', data}] },
+      options:{responsive:true, plugins:{legend:{display:false}}}
+    });
+  } catch(e){ console.error(e); }
+
+  // Leave forecast
+  try {
+    const lf = await GET('/api/v1/analytics/leave_forecast/');
+    const labels = lf.history.map(x=>x.month).concat(lf.forecast.map(x=>x.month));
+    const histVals = lf.history.map(x=>x.value);
+    const fcVals = new Array(lf.history.length).fill(null).concat(lf.forecast.map(x=>x.value));
+    new Chart(document.getElementById('chartLeave'), {
+      type:'line',
+      data:{ labels,
+        datasets:[
+          {label:'Historique', data:[...histVals, ...new Array(lf.forecast.length).fill(null)]},
+          {label:'Prévision', data:fcVals, borderDash:[6,6]}
+        ]},
+      options:{responsive:true, plugins:{legend:{position:'bottom'}}}
+    });
+  } catch(e){ console.error(e); }
+
+  // Leave SLA
+  try {
+    const sla = await GET('/api/v1/analytics/leave_sla/');
+    new Chart(document.getElementById('chartLeaveAging'), {
+      type:'bar',
+      data:{
+        labels:Object.keys(sla.pending_age_buckets),
+        datasets:[{label:'En attente (par âge)', data:Object.values(sla.pending_age_buckets)}]
+      },
+      options:{plugins:{legend:{display:false}}}
+    });
+    const sc = sla.status_counts || {};
+    new Chart(document.getElementById('chartLeaveStatus'), {
+      type:'doughnut',
+      data:{
+        labels:Object.keys(sc),
+        datasets:[{label:'Demandes', data:Object.values(sc)}]
+      }
+    });
+  } catch(e){ console.error(e); }
+
+  // Attrition risk
+  try {
+    const ar = await GET('/api/v1/analytics/attrition_risk/');
+    const tbody = document.getElementById('attritionTable');
+    tbody.innerHTML = (ar.top||[]).slice(0,10).map(r => `
+      <tr>
+        <td>${r.employee.first_name} ${r.employee.last_name}</td>
+        <td>${r.employee.department||'—'}</td>
+        <td>${r.employee.grade||'—'}</td>
+        <td class="text-right">${(r.score*100).toFixed(1)}%</td>
+      </tr>`).join('') || '<tr><td colspan="4" class="text-center py-4 text-gray-500">Aucune donnée</td></tr>';
+  } catch(e){ console.error(e); }
+
+  // Notification engagement
+  try {
+    const ne = await GET('/api/v1/analytics/notification_engagement/');
+    const labels = ne.channels.map(x=>x.channel);
+    const rates  = ne.channels.map(x=>x.read_rate);
+    new Chart(document.getElementById('chartNotifChannels'),{
+      type:'bar',
+      data:{ labels, datasets:[{label:'Taux de lecture (%)', data:rates}] },
+      options:{scales:{y:{beginAtZero:true, max:100}}}
+    });
+    const rlabels = ne.unread_by_role.map(x=>x.role);
+    const rdata   = ne.unread_by_role.map(x=>x.count);
+    new Chart(document.getElementById('chartUnreadRole'),{
+      type:'bar',
+      data:{ labels:rlabels, datasets:[{label:'Non lus', data:rdata}] },
+      options:{plugins:{legend:{display:false}}}
+    });
+  } catch(e){ console.error(e); }
+})();
+</script>
+{% endblock %} {% endcomment %}
+
+
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-blue-700 uppercase  flex items-center gap-2 mb-6">
+    <i class="fas fa-chart-line"></i> Tableau de Bord <span class="text-red-500"> ANALITIQUE </span>
+  </h1>
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+    <div class="card shadow bg-white shadow-xl border-l-4 border-blue-600 p-4">
+      <div class="text-sm text-gray-500">Effectif</div>
+      <div id="kpiHeadcount" class="text-2xl font-semibold text-blue-700">—</div>
+        <div class="absolute bottom-1 right-2 text-xs text-gray-400">
+            Contrat | Employé
+        </div>
+    </div>
+    <div class="card shadow bg-white shadow-xl border-l-4 border-rose-600 p-4">
+      <div class="text-sm text-gray-500">Turnover (12m)</div>
+      <div id="kpiTurnover" class="text-2xl font-semibold text-rose-700">—</div>
+        <div class="absolute bottom-1 right-2 text-xs text-gray-400">
+            Rotation | Contrat
+        </div>
+    </div>
+    <div class="card shadow bg-white shadow-xl border-l-4 border-emerald-600 p-4">
+      <div class="text-sm text-gray-500">Paie (dernier run)</div>
+      <div id="kpiPayroll" class="text-2xl font-semibold text-emerald-700">—</div>
+        <div class="absolute bottom-1 right-2 text-xs text-gray-400">
+            Total | Montant
+        </div>
+    </div>
+    <div class="card shadow bg-white shadow-xl border-l-4 border-amber-600 p-4">
+      <div class="text-sm text-gray-500">Congés en attente</div>
+      <div id="kpiPending" class="text-2xl font-semibold text-amber-700">—</div>
+        <div class="absolute bottom-1 right-2 text-xs text-gray-400">
+            En attente | Demande
+        </div>
+    </div>
+    <div class="card shadow bg-white shadow-xl border-l-4 border-indigo-600 p-4">
+      <div class="text-sm text-gray-500">Taux de lecture (30j)</div>
+      <div id="kpiReadRate" class="text-2xl font-semibold text-indigo-700">—</div>
+        <div class="absolute bottom-1 right-2 text-xs text-gray-400">
+            Engagement | Notification
+        </div>
+    </div>
+  </div>
+
+  <!-- Row 1 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="card shadow bg-white p-4 shadow-xl border-l-4 border-red-600">
+      <div class="font-semibold text-blue-700 mb-2">Effectif — historique & prévision</div>
+      <div class="relative w-full h-64">
+        <canvas id="chartHeadcount"></canvas>
+      </div>
+    </div>
+    <div class="card shadow bg-white p-4 shadow-xl border-l-4 border-indigo-600">
+      <div class="font-semibold text-blue-700 mb-2">Paie — décomposition par composant</div>
+      <div class="relative w-full h-64">
+        <canvas id="chartPayroll"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="card shadow bg-white p-4 shadow-xl border-l-4 border-gray-600">
+      <div class="font-semibold text-blue-700 mb-2">Congés — historique & prévision</div>
+      <div class="relative w-full h-64">
+        <canvas id="chartLeave"></canvas>
+      </div>
+    </div>
+    <div class="card shadow bg-white p-4 shadow-xl border-l-4 border-green-600">
+      <div class="font-semibold text-blue-700 mb-2">SLA des demandes de congé</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="relative w-full h-64">
+          <canvas id="chartLeaveAging"></canvas>
+        </div>
+        <div class="relative w-full h-64">
+          <canvas id="chartLeaveStatus"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="card shadow bg-white p-4 shadow-xl border-l-4 border-orange-600">
+      <div class="font-semibold text-blue-700 mb-2">Risque d’attrition — top 10</div>
+      <div class="overflow-x-auto">
+        <table class="table w-full">
+          <thead><tr class="text-gray-500"><th>Employé</th><th>Dept</th><th>Grade</th><th class="text-right">Score</th></tr></thead>
+          <tbody id="attritionTable"><tr><td colspan="4" class="text-center py-4 text-gray-500">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card shadow bg-white p-4 shadow-xl border-l-4 border-blue-600">
+      <div class="font-semibold text-blue-700 mb-2">Engagement notifications</div>
+      <div class="relative w-full h-64">
+        <canvas id="chartNotifChannels"></canvas>
+      </div>
+      <div class="mt-4 relative w-full h-64">
+        <canvas id="chartUnreadRole"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(async function() {
+  const fmtMoney = n => new Intl.NumberFormat('fr-FR', {style:'currency', currency:'XOF'}).format(n);
+  const GET = async (url) => {
+    const r = await fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!r.ok) throw new Error(url + ' → ' + r.status);
+    return await r.json();
+  };
+
+  // KPIs
+  try {
+    const k = await GET('/api/v1/analytics/kpis/');
+    document.getElementById('kpiHeadcount').textContent = k.headcount;
+    document.getElementById('kpiTurnover').textContent = k.turnover_12m;
+    document.getElementById('kpiPayroll').textContent = fmtMoney(k.payroll_latest_total || 0);
+    document.getElementById('kpiPending').textContent = k.leave_pending;
+    document.getElementById('kpiReadRate').textContent = (k.read_rate_30d||0) + '%';
+  } catch(e) { console.error(e); }
+
+  // Headcount
+  try {
+    const hc = await GET('/api/v1/analytics/headcount_forecast/');
+    const labels = hc.history.map(x=>x.month).concat(hc.forecast.map(x=>x.month));
+    const histVals = hc.history.map(x=>x.value);
+    const fcVals = new Array(hc.history.length).fill(null).concat(hc.forecast.map(x=>x.value));
+    new Chart(document.getElementById('chartHeadcount'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {label: 'Historique', data: [...histVals, ...new Array(hc.forecast.length).fill(null)], backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: 'rgb(59, 130, 246)'},
+          {label: 'Prévision', data: fcVals, borderDash: [6,6], backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: 'rgb(59, 130, 246)'}
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {position: 'bottom'}},
+        scales: {y: {beginAtZero: true}}
+      }
+    });
+  } catch(e) { console.error(e); }
+
+  // Payroll components
+  try {
+    const pc = await GET('/api/v1/analytics/payroll_components/');
+    const labels = pc.components.map(x=>x.code);
+    const data = pc.components.map(x=>x.total);
+    new Chart(document.getElementById('chartPayroll'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{label: 'Montant', data, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: 'rgb(59, 130, 246)'}]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {display: false}},
+        scales: {y: {beginAtZero: true}}
+      }
+    });
+  } catch(e) { console.error(e); }
+
+  // Leave forecast
+  try {
+    const lf = await GET('/api/v1/analytics/leave_forecast/');
+    const labels = lf.history.map(x=>x.month).concat(lf.forecast.map(x=>x.month));
+    const histVals = lf.history.map(x=>x.value);
+    const fcVals = new Array(lf.history.length).fill(null).concat(lf.forecast.map(x=>x.value));
+    new Chart(document.getElementById('chartLeave'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {label: 'Historique', data: [...histVals, ...new Array(lf.forecast.length).fill(null)], backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: 'rgb(59, 130, 246)'},
+          {label: 'Prévision', data: fcVals, borderDash: [6,6], backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: 'rgb(59, 130, 246)'}
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {position: 'bottom'}},
+        scales: {y: {beginAtZero: true}}
+      }
+    });
+  } catch(e) { console.error(e); }
+
+  // Leave SLA
+  try {
+    const sla = await GET('/api/v1/analytics/leave_sla/');
+    new Chart(document.getElementById('chartLeaveAging'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(sla.pending_age_buckets),
+        datasets: [{label: 'En attente (par âge)', data: Object.values(sla.pending_age_buckets), backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: 'rgb(59, 130, 246)'}]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {display: false}},
+        scales: {y: {beginAtZero: true}}
+      }
+    });
+    const sc = sla.status_counts || {};
+    new Chart(document.getElementById('chartLeaveStatus'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(sc),
+        datasets: [{
+          label: 'Demandes',
+          data: Object.values(sc),
+          backgroundColor: ['rgba(59, 130, 246, 0.5)', 'rgba(239, 68, 68, 0.5)', 'rgba(16, 185, 129, 0.5)', 'rgba(245, 158, 11, 0.5)']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {position: 'bottom'},
+          tooltip: {enabled: true}
+        }
+      }
+    });
+  } catch(e) { console.error(e); }
+
+  // Attrition risk
+  try {
+    const ar = await GET('/api/v1/analytics/attrition_risk/');
+    const tbody = document.getElementById('attritionTable');
+    tbody.innerHTML = (ar.top||[]).slice(0,10).map(r => `
+      <tr>
+        <td>${r.employee.first_name} ${r.employee.last_name}</td>
+        <td>${r.employee.department||'—'}</td>
+        <td>${r.employee.grade||'—'}</td>
+        <td class="text-right">${(r.score*100).toFixed(1)}%</td>
+      </tr>`).join('') || '<tr><td colspan="4" class="text-center py-4 text-gray-500">Aucune donnée</td></tr>';
+  } catch(e) { console.error(e); }
+
+  // Notification engagement
+  try {
+    const ne = await GET('/api/v1/analytics/notification_engagement/');
+    const labels = ne.channels.map(x=>x.channel);
+    const rates = ne.channels.map(x=>x.read_rate);
+    new Chart(document.getElementById('chartNotifChannels'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{label: 'Taux de lecture (%)', data: rates, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: 'rgb(59, 130, 246)'}]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {y: {beginAtZero: true, max: 100}},
+        plugins: {legend: {position: 'bottom'}}
+      }
+    });
+    const rlabels = ne.unread_by_role.map(x=>x.role);
+    const rdata = ne.unread_by_role.map(x=>x.count);
+    new Chart(document.getElementById('chartUnreadRole'), {
+      type: 'bar',
+      data: {
+        labels: rlabels,
+        datasets: [{label: 'Non lus', data: rdata, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: 'rgb(59, 130, 246)'}]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {display: false}},
+        scales: {y: {beginAtZero: true}}
+      }
+    });
+  } catch(e) { console.error(e); }
+})();
+</script>
+{% endblock %}

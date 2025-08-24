@@ -1,0 +1,390 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-4">
+        <i class="fas fa-calendar-plus text-blue-600"></i> Nouvelle Demande de Congé
+    </h1>
+    <div id="employeeInfo" class="mb-4 text-gray-800 font-semibold">
+        <p>Chargement des informations de l'employé...</p>
+    </div>
+
+    <form id="leaveCreateForm" enctype="multipart/form-data" class="grid grid-cols-1 gap-4 max-w-lg mx-auto">
+        {% csrf_token %}
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Type de Congé</span></label>
+            <select name="leave_type_id" id="leaveType" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                <option value="" disabled selected>Sélectionner un type</option>
+                {% for lt in leave_types %}
+                <option value="{{ lt.id }}" data-requires-attachment="{{ lt.requires_attachment }}" data-is-hourly="{{ lt.is_hourly }}">{{ lt.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Date de Début</span></label>
+            <input type="date" name="start_date" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Date de Fin</span></label>
+            <input type="date" name="end_date" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+        </div>
+        <div class="form-control" id="halfDayField" style="display: none;">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Demi-journée</span></label>
+            <input type="checkbox" name="is_half_day" class="checkbox checkbox-primary">
+        </div>
+        <div class="form-control" id="startTimeField" style="display: none;">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Heure de Début</span></label>
+            <input type="time" name="start_time" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+        </div>
+        <div class="form-control" id="endTimeField" style="display: none;">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Heure de Fin</span></label>
+            <input type="time" name="end_time" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Raison</span></label>
+            <textarea name="reason" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800"></textarea>
+        </div>
+        <div class="form-control" id="documentField">
+            <label class="label"><span id="documentLabel" class="label-text font-semibold text-gray-800">Justificatif (facultatif)</span></label>
+            <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                 id="dropZone" role="region" aria-label="Zone de dépôt pour le justificatif">
+                <input type="file" name="document_file" id="documentInput"
+                       class="file-input file-input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800 opacity-0 absolute inset-0 cursor-pointer"
+                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                <div class="text-center text-gray-600">
+                    <i class="fas fa-upload text-blue-500 text-2xl mb-2"></i>
+                    <p id="dropZoneText">Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)</p>
+                </div>
+            </div>
+            <p id="fileName" class="text-sm text-gray-500 mt-2"></p>
+            <div id="documentDetails" class="grid grid-cols-1 gap-4 mt-4" style="display: none;">
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Type de Document</span></label>
+                    <select name="document_type" id="documentType" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                        <option value="" disabled selected>Sélectionner un type</option>
+                        <option value="arrete">Arrêté</option>
+                        <option value="certificat_medical">Certificat Médical</option>
+                        <option value="contrat">Contrat</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Date d'Émission</span></label>
+                    <input type="date" name="issuance_date" id="issuanceDate" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Émis Par</span></label>
+                    <input type="text" name="issued_by" id="issuedBy" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Note (facultatif)</span></label>
+                    <textarea name="content_text" id="contentText" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800"></textarea>
+                </div>
+            </div>
+        </div>
+        <div id="formErrors" class="alert alert-error hidden">
+            <ul id="errorList" class="list-disc pl-5"></ul>
+        </div>
+        <div class="flex justify-end gap-2">
+            <button type="submit" class="btn bg-green-500 hover:bg-green-600 text-white">Soumettre</button>
+            <a href="{% url 'my_leave' %}" class="btn btn-ghost text-gray-600 hover:bg-gray-100">Annuler</a>
+        </div>
+    </form>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        }
+        return null;
+    }
+
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1"><p class="text-sm font-medium">${message}</p></div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    async function fetchEmployeeInfo() {
+        try {
+            const response = await fetch('/api/v1/employees/me/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement des informations de l\'employé');
+            const data = await response.json();
+            const roleText = {
+                'EMP': 'Employé',
+                'MANAGER': 'Manager',
+                'HR': 'Officier RH',
+                'ADMIN': 'Admin'
+            }[data.user.role] || data.user.role;
+            document.getElementById('employeeInfo').innerHTML = `
+                <p class="italic">Vous êtes en train de faire cette demande en tant que ${data.first_name} ${data.last_name}...</p>
+            `;
+            return { id: data.id };
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+            document.getElementById('employeeInfo').innerHTML = `<p class="text-red-600">Erreur: Impossible de charger les informations de l'employé</p>`;
+            return null;
+        }
+    }
+
+    async function fetchLeaveRequestContentType() {
+        try {
+            const response = await fetch('/api/v1/documents/contenttypes/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors de la récupération du ContentType');
+            const data = await response.json();
+            const contentTypes = data.results || data; // Handle paginated or non-paginated response
+            const leaveRequestType = contentTypes.find(ct => ct.model === 'leaverequest' && ct.app_label === 'leave');
+            if (!leaveRequestType) throw new Error('ContentType pour LeaveRequest non trouvé');
+            return leaveRequestType.id;
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+            return null;
+        }
+    }
+
+    async function uploadDocument(file, documentType, issuanceDate, issuedBy, contentText) {
+        if (!file) return null;
+        const contentTypeId = await fetchLeaveRequestContentType();
+        if (!contentTypeId) return null;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_type', documentType);
+        formData.append('issuance_date', issuanceDate);
+        formData.append('issued_by', issuedBy);
+        formData.append('status', 'to_validate');
+        formData.append('content_type', contentTypeId);
+        formData.append('object_id', '1'); // Temporary ID, updated later
+        if (contentText) formData.append('content_text', contentText);
+        try {
+            const response = await fetch('/api/v1/documents/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: formData
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                const errors = errorData.detail || errorData;
+                let errorMessage = 'Erreur lors du téléversement du document';
+                if (typeof errors === 'object') {
+                    errorMessage = Object.entries(errors).map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(', ') : errs}`).join('; ');
+                } else if (Array.isArray(errors)) {
+                    errorMessage = errors.join('; ');
+                }
+                throw new Error(errorMessage);
+            }
+            const data = await response.json();
+            return data.id;
+        } catch (error) {
+            showToast(`Erreur lors du téléversement du document: ${error.message}`, 'error');
+            return null;
+        }
+    }
+
+    // Drag-and-drop functionality
+    const dropZone = document.getElementById('dropZone');
+    const documentInput = document.getElementById('documentInput');
+    const dropZoneText = document.getElementById('dropZoneText');
+    const fileNameDisplay = document.getElementById('fileName');
+    const documentDetails = document.getElementById('documentDetails');
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-blue-500', 'bg-blue-50');
+        dropZoneText.textContent = 'Relâchez pour déposer le fichier';
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+        dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+        dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            documentInput.files = files;
+            fileNameDisplay.textContent = `Fichier sélectionné : ${files[0].name}`;
+            documentDetails.style.display = 'block';
+        }
+    });
+
+    documentInput.addEventListener('change', () => {
+        if (documentInput.files.length > 0) {
+            fileNameDisplay.textContent = `Fichier sélectionné : ${documentInput.files[0].name}`;
+            documentDetails.style.display = 'block';
+        } else {
+            fileNameDisplay.textContent = '';
+            documentDetails.style.display = 'none';
+        }
+    });
+
+    document.getElementById('leaveType').addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const isHourly = selectedOption.dataset.isHourly === 'true';
+        const requiresAttachment = selectedOption.dataset.requiresAttachment === 'true';
+        document.getElementById('halfDayField').style.display = isHourly ? 'none' : 'block';
+        document.getElementById('startTimeField').style.display = isHourly ? 'block' : 'none';
+        document.getElementById('endTimeField').style.display = isHourly ? 'block' : 'none';
+        const documentLabel = document.getElementById('documentLabel');
+        const documentInput = document.getElementById('documentInput');
+        documentLabel.textContent = requiresAttachment ? 'Justificatif' : 'Justificatif (facultatif)';
+        documentInput.required = requiresAttachment;
+    });
+
+    document.getElementById('leaveCreateForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        data.is_half_day = formData.get('is_half_day') === 'on';
+
+        const errorList = document.getElementById('errorList');
+        const formErrors = document.getElementById('formErrors');
+        errorList.innerHTML = '';
+        formErrors.classList.add('hidden');
+
+        // Client-side validation
+        if (new Date(data.start_date) > new Date(data.end_date)) {
+            errorList.innerHTML = '<li>La date de début doit être antérieure à la date de fin.</li>';
+            formErrors.classList.remove('hidden');
+            return;
+        }
+        const selectedOption = document.getElementById('leaveType').options[document.getElementById('leaveType').selectedIndex];
+        const requiresAttachment = selectedOption.dataset.requiresAttachment === 'true';
+        const file = formData.get('document_file');
+        if (requiresAttachment && (!file || file.size === 0)) {
+            errorList.innerHTML = '<li>Un justificatif est requis pour ce type de congé.</li>';
+            formErrors.classList.remove('hidden');
+            return;
+        }
+        if (file && file.size > 0) {
+            if (!data.document_type) {
+                errorList.innerHTML = '<li>Le type de document est requis.</li>';
+                formErrors.classList.remove('hidden');
+                return;
+            }
+            if (!data.issuance_date) {
+                errorList.innerHTML = '<li>La date d\'émission est requise.</li>';
+                formErrors.classList.remove('hidden');
+                return;
+            }
+            if (!data.issued_by) {
+                errorList.innerHTML = '<li>Émis par est requis.</li>';
+                formErrors.classList.remove('hidden');
+                return;
+            }
+        }
+        if (data.is_hourly && (!data.start_time || !data.end_time)) {
+            errorList.innerHTML = '<li>Les heures de début et de fin sont requises pour les congés horaires.</li>';
+            formErrors.classList.remove('hidden');
+            return;
+        }
+
+        // Fetch employee info for employee_id
+        const employeeInfo = await fetchEmployeeInfo();
+        if (!employeeInfo) return;
+
+        // Upload document first if provided
+        let documentId = null;
+        if (file && file.size > 0) {
+            documentId = await uploadDocument(
+                file,
+                data.document_type,
+                data.issuance_date,
+                data.issued_by,
+                data.content_text
+            );
+            if (!documentId) return;
+        }
+
+        // Prepare data for leave request
+        const leaveData = new FormData();
+        leaveData.append('leave_type_id', data.leave_type_id);
+        leaveData.append('start_date', data.start_date);
+        leaveData.append('end_date', data.end_date);
+        leaveData.append('is_half_day', data.is_half_day);
+        if (data.reason) leaveData.append('reason', data.reason);
+        if (data.start_time) leaveData.append('start_time', data.start_time);
+        if (data.end_time) leaveData.append('end_time', data.end_time);
+        leaveData.append('employee_id', employeeInfo.id);
+        if (documentId) leaveData.append('document_id', documentId);
+
+        // Create leave request
+        try {
+            const response = await fetch('/api/v1/leave/leave/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: leaveData
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                const errors = errorData.non_field_errors || errorData.detail || errorData;
+                if (Array.isArray(errors)) {
+                    errorList.innerHTML = errors.map(err => `<li>${err}</li>`).join('');
+                } else {
+                    errorList.innerHTML = Object.entries(errors).map(([field, errs]) => `<li>${field}: ${Array.isArray(errs) ? errs.join(', ') : errs}</li>`).join('');
+                }
+                formErrors.classList.remove('hidden');
+                throw new Error('Erreur lors de la soumission de la demande de congé');
+            }
+            await response.json();
+            showToast('Demande de congé soumise avec succès!', 'success');
+            setTimeout(() => window.location.href = '{% url "my_leave" %}', 1000);
+        } catch (error) {
+            showToast(`Erreur lors de la soumission: ${error.message}`, 'error');
+            return;
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchEmployeeInfo();
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,438 @@
+{% load static tailwind_tags %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HRMIS - République de Côte d'Ivoire{% endblock %}</title>
+    <link rel="icon" href="{% static 'images/favicon.ico' %}">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    {% tailwind_css %}
+    <style>
+        body.flag-bg {
+            background-size: 300% 100%;
+            animation: flag-animation 15s ease-in-out infinite;
+            background-image: linear-gradient(to right, 
+                #F77F00 0%, #F77F00 33.3%,
+                #FFFFFF 33.3%, #FFFFFF 66.6%,
+                #009739 66.6%, #009739 100%
+            );
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes flag-animation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .input-wrapper {
+            transition: all 0.2s ease-out;
+            border-radius: var(--rounded-btn, 0.5rem);
+        }
+        .input-wrapper.focused {
+            transform: scale(1.01);
+            box-shadow: 0 0 0 3px rgba(247, 127, 0, 0.3);
+        }
+        .input:focus, select:focus {
+            outline: none;
+        }
+        .login-container {
+            max-width: 28rem;
+            width: 100%;
+            max-height: 95vh;
+            overflow-y: auto;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        .login-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .login-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        .login-container::-webkit-scrollbar-thumb {
+            background: rgba(247, 127, 0, 0.5);
+            border-radius: 10px;
+        }
+        .login-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(247, 127, 0, 0.7);
+        }
+
+        .modal-box {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #registerForm .input, #registerForm select {
+            @apply input input-bordered w-full pl-12 bg-gray-50 border-gray-300 focus:border-orange-600 focus:bg-white transition-all duration-200 text-gray-800 placeholder-gray-400;
+        }
+    </style>
+</head>
+<body class="font-sans leading-normal tracking-normal flag-bg">
+    <div class="login-container space-y-8 p-4 bg-white bg-opacity-90 rounded-xl shadow-2xl backdrop-blur-sm relative z-10">
+        <div class="text-center">
+            <div class="mx-auto h-24 w-24 bg-gradient-to-br from-orange-600 to-green-600 rounded-full flex items-center justify-center shadow-xl mb-6 transform hover:scale-105 transition-transform duration-300 ease-in-out">
+                <span class="text-white text-4xl font-bold tracking-tight">CI</span>
+            </div>
+            <h2 class="text-4xl font-extrabold text-gray-800 mb-2 animate-fade-in-up">
+                Créer un <span class="text-orange-600">Compte</span>
+            </h2>
+            <p class="text-gray-600 text-base animate-fade-in">
+                Rejoignez le Système de Gestion des Ressources Humaines
+            </p>
+        </div>
+
+        <div class="card bg-white shadow-2xl border border-gray-100 overflow-hidden rounded-xl">
+            <div class="bg-gradient-to-r from-orange-600 to-green-600 p-6 text-center shadow-md">
+                <h3 class="text-xl font-semibold text-white flex items-center justify-center gap-2">
+                    <i class="fas fa-user-plus"></i>
+                    Nouvelle Inscription
+                </h3>
+            </div>
+
+            <div class="card-body p-8 border-t-4 border-white">
+                <div id="errorMessage" class="alert alert-error bg-orange-100 border-l-4 border-orange-600 text-gray-800 mb-6 hidden transform-gpu transition-all duration-300 ease-out translate-y-2 opacity-0 rounded-md">
+                    <i class="fas fa-exclamation-circle text-orange-600 mr-2"></i>
+                    <div id="errorContent"></div>
+                </div>
+
+                <form method="post" id="registerForm" class="space-y-6">
+                    {% csrf_token %}
+                    <div class="form-control">
+                        <label class="label" for="{{ form.username.id_for_label }}">
+                            <span class="label-text font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-user text-orange-600"></i>
+                                {{ form.username.label }}
+                            </span>
+                        </label>
+                        <div class="relative input-wrapper">
+                            {{ form.username }}
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" for="{{ form.email.id_for_label }}">
+                            <span class="label-text font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-envelope text-orange-600"></i>
+                                {{ form.email.label }}
+                            </span>
+                        </label>
+                        <div class="relative input-wrapper">
+                            {{ form.email }}
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-envelope text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" for="{{ form.role.id_for_label }}">
+                            <span class="label-text font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-user-tag text-orange-600"></i>
+                                {{ form.role.label }}
+                            </span>
+                        </label>
+                        <div class="relative input-wrapper">
+                            {{ form.role }}
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user-tag text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" for="{{ form.password.id_for_label }}">
+                            <span class="label-text font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-lock text-orange-600"></i>
+                                {{ form.password.label }}
+                            </span>
+                        </label>
+                        <div class="relative input-wrapper">
+                            {{ form.password }}
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <button 
+                                type="button" 
+                                id="togglePassword" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-orange-600 transition-colors duration-200"
+                                aria-label="Afficher ou masquer le mot de passe"
+                            >
+                                <i class="fas fa-eye" id="eyeIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" for="{{ form.password_confirm.id_for_label }}">
+                            <span class="label-text font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-lock text-orange-600"></i>
+                                {{ form.password_confirm.label }}
+                            </span>
+                        </label>
+                        <div class="relative input-wrapper">
+                            {{ form.password_confirm }}
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                        <button type="submit" id="registerBtn" class="btn w-full sm:w-auto bg-gradient-to-r from-green-600 to-orange-600 hover:from-orange-600 hover:to-green-600 text-white font-semibold text-lg py-3 border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.01]">
+                            <span id="registerBtnText" class="flex items-center justify-center">
+                                <i class="fas fa-user-plus mr-2"></i>
+                                S'inscrire
+                            </span>
+                            <span id="registerBtnLoading" class="hidden flex items-center justify-center">
+                                <span class="loading loading-spinner loading-sm mr-2"></span>
+                                Inscription en cours...
+                            </span>
+                        </button>
+                        <a href="{% url 'login' %}" class="btn btn-outline w-full sm:w-auto border-gray-800 text-gray-800 hover:bg-gray-800 hover:border-gray-800 hover:text-white transition-all duration-300">
+                            <i class="fas fa-times mr-2"></i>
+                            Annuler
+                        </a>
+                    </div>
+                </form>
+
+                <div class="divider my-6 text-gray-400">ou</div>
+
+                <div class="text-center">
+                    <p class="text-gray-600 mb-4">Vous avez déjà un compte ?</p>
+                    <a 
+                        href="{% url 'login' %}" 
+                        class="btn btn-outline btn-wide border-orange-600 text-orange-600 hover:bg-green-600 hover:border-green-600 hover:text-white transition-all duration-300"
+                    >
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Se connecter
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center pb-4 sm:pb-0">
+            <div class="flex items-center justify-center gap-4 text-sm text-gray-500 mb-4">
+                <div class="flex items-center gap-1">
+                    <i class="fas fa-shield-alt text-green-600"></i>
+                    <span>Sécurisé & Privé</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <i class="fas fa-clock text-orange-600"></i>
+                    <span>Assistance 24/7</span>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400">
+                © 2025 République de Côte d'Ivoire - Tous droits réservés
+            </p>
+        </div>
+    </div>
+
+    <dialog id="successModal" class="modal">
+        <div class="modal-box text-center p-8 bg-white rounded-lg shadow-xl">
+            <div class="mb-4">
+                <div class="mx-auto w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mb-4 transform scale-90 animate-pop-in">
+                    <i class="fas fa-check text-white text-3xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-green-600 animate-fade-in-up">Inscription réussie !</h3>
+                <p class="text-gray-600 mt-2 animate-fade-in">Redirection vers la page de connexion...</p>
+            </div>
+            <div class="flex justify-center mt-6">
+                <span class="loading loading-dots loading-lg text-green-600"></span>
+            </div>
+        </div>
+    </dialog>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const registerForm = document.getElementById('registerForm');
+        const registerBtn = document.getElementById('registerBtn');
+        const registerBtnText = document.getElementById('registerBtnText');
+        const registerBtnLoading = document.getElementById('registerBtnLoading');
+        const passwordInput = document.getElementById('id_password');
+        const passwordConfirmInput = document.getElementById('id_password_confirm');
+        const usernameInput = document.getElementById('id_username');
+        const emailInput = document.getElementById('id_email');
+        const roleInput = document.getElementById('id_role');
+        const togglePassword = document.getElementById('togglePassword');
+        const eyeIcon = document.getElementById('eyeIcon');
+        const successModal = document.getElementById('successModal');
+        const errorMessageDiv = document.getElementById('errorMessage');
+        const errorContent = document.getElementById('errorContent');
+
+        // Apply Input Styles
+        const applyInputStyles = (inputElement) => {
+            if (inputElement && inputElement.tagName === 'INPUT') {
+                inputElement.classList.add(
+                    'input', 'input-bordered', 'w-full', 'pl-12', 'bg-gray-50',
+                    'border-gray-300', 'focus:border-orange-600', 'focus:bg-white',
+                    'transition-all', 'duration-200', 'text-gray-800', 'placeholder-gray-400'
+                );
+                inputElement.setAttribute('placeholder', `Entrez votre ${inputElement.previousElementSibling?.querySelector('.label-text')?.textContent?.toLowerCase().replace(' *', '') || inputElement.id.replace('id_', '').replace('_', ' ')}`);
+            } else if (inputElement && inputElement.tagName === 'SELECT') {
+                inputElement.classList.add(
+                    'select', 'select-bordered', 'w-full', 'pl-12', 'bg-gray-50',
+                    'border-gray-300', 'focus:border-orange-600', 'focus:bg-white',
+                    'transition-all', 'duration-200', 'text-gray-800'
+                );
+            }
+        };
+
+        applyInputStyles(usernameInput);
+        applyInputStyles(emailInput);
+        applyInputStyles(roleInput);
+        applyInputStyles(passwordInput);
+        applyInputStyles(passwordConfirmInput);
+
+        // Input Field Focus Animations
+        const inputWrappers = document.querySelectorAll('.input-wrapper');
+        inputWrappers.forEach(wrapper => {
+            const input = wrapper.querySelector('input, select');
+            if (input) {
+                input.addEventListener('focus', () => wrapper.classList.add('focused'));
+                input.addEventListener('blur', () => wrapper.classList.remove('focused'));
+            }
+        });
+
+        // Password Toggle Functionality
+        if (togglePassword && passwordInput && eyeIcon) {
+            togglePassword.addEventListener('click', function() {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                eyeIcon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+                passwordInput.focus();
+            });
+        }
+
+        // Loading State Management
+        function setLoadingState(loading) {
+            registerBtn.disabled = loading;
+            registerBtnText.classList.toggle('hidden', loading);
+            registerBtnLoading.classList.toggle('hidden', !loading);
+            registerBtn.classList.toggle('opacity-80', loading);
+            if (loading) {
+                registerBtn.classList.add('cursor-not-allowed');
+            } else {
+                registerBtn.classList.remove('cursor-not-allowed');
+            }
+        }
+
+        // Error Message Display
+        function displayErrorMessage(messages) {
+            errorContent.innerHTML = Array.isArray(messages) ? messages.map(msg => `<p>${msg}</p>`).join('') : `<p>${messages}</p>`;
+            errorMessageDiv.classList.remove('hidden', 'opacity-0', 'translate-y-2');
+            errorMessageDiv.classList.add('opacity-100', 'translate-y-0');
+        }
+
+        function hideErrorMessage() {
+            errorMessageDiv.classList.remove('opacity-100', 'translate-y-0');
+            errorMessageDiv.classList.add('opacity-0', 'translate-y-2');
+            errorMessageDiv.addEventListener('transitionend', () => {
+                if (errorMessageDiv.classList.contains('opacity-0')) {
+                    errorMessageDiv.classList.add('hidden');
+                }
+            }, { once: true });
+        }
+
+        // Form Validation
+        function validateForm() {
+            const username = usernameInput.value.trim();
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+            const passwordConfirm = passwordConfirmInput.value;
+            const role = roleInput.value;
+
+            if (!username) {
+                displayErrorMessage('Veuillez entrer votre nom d\'utilisateur.');
+                usernameInput.focus();
+                return false;
+            }
+            if (!email) {
+                displayErrorMessage('Veuillez entrer votre adresse e-mail.');
+                emailInput.focus();
+                return false;
+            }
+            if (!role) {
+                displayErrorMessage('Veuillez sélectionner un rôle.');
+                roleInput.focus();
+                return false;
+            }
+            if (!password) {
+                displayErrorMessage('Veuillez entrer votre mot de passe.');
+                passwordInput.focus();
+                return false;
+            }
+            if (password.length < 4) {
+                displayErrorMessage('Le mot de passe doit contenir au moins 4 caractères.');
+                passwordInput.focus();
+                return false;
+            }
+            if (password !== passwordConfirm) {
+                displayErrorMessage('Les mots de passe ne correspondent pas.');
+                passwordConfirmInput.focus();
+                return false;
+            }
+            hideErrorMessage();
+            return true;
+        }
+
+        // Form Submission Logic
+        registerForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!validateForm()) {
+                return;
+            }
+            setLoadingState(true);
+            const formData = {
+                username: usernameInput.value.trim(),
+                email: emailInput.value.trim(),
+                role: roleInput.value,
+                password: passwordInput.value,
+                password_confirm: passwordConfirmInput.value
+            };
+            try {
+                const response = await fetch('/register/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    successModal.showModal();
+                    setTimeout(() => {
+                        window.location.href = '{% url 'login' %}';
+                    }, 1500);
+                } else {
+                    displayErrorMessage(data.errors || 'Erreur lors de l\'inscription.');
+                }
+            } catch (error) {
+                console.error('Erreur lors de l\'inscription:', error);
+                displayErrorMessage('Une erreur de réseau est survenue. Veuillez réessayer.');
+            } finally {
+                setLoadingState(false);
+            }
+        });
+
+        // Auto-focus username field
+        if (usernameInput) {
+            usernameInput.focus();
+        }
+    });
+    </script>
+</body>
+</html>

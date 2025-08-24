@@ -1,0 +1,78 @@
+{% extends 'main/base.html' %}
+{% block title %}Audit — Détail{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+                <i class="fas fa-file-alt"></i> Détail du log #{{ entry.id }}
+            </h1>
+
+            <a href="{% url 'audit_index_view' %}" class="btn bg-blue-100 text-blue-800 hover:bg-blue-200"><i class="fas fa-arrow-left mr-2"></i> Journal d'Audit </a>
+        </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-blue-900">
+        <div>
+          <div><span class="font-semibold">Date:</span> {{ entry.timestamp }}</div>
+          <div><span class="font-semibold">Utilisateur:</span> {{ entry.actor|default:"—" }}</div>
+          <div>
+            <span class="font-semibold">Action:</span>
+            {% if entry.get_action_display %}
+              {{ entry.get_action_display }}
+            {% else %}
+              {{ entry.action }}
+            {% endif %}
+          </div>
+          <div><span class="font-semibold">IP:</span> {{ entry.remote_addr|default:"—" }}</div>
+        </div>
+        <div>
+          <div><span class="font-semibold">Objet:</span>
+            {% if entry.content_type %}
+              {{ entry.content_type.app_label }}.{{ entry.content_type.model }}
+            {% else %}
+              {{ entry.object_type|default:"(inconnu)" }}
+            {% endif %}
+            #{{ entry.object_pk }}
+          </div>
+          <div><span class="font-semibold">Représentation:</span> {{ entry.object_repr|default:"—" }}</div>
+          {% if entry.additional_data %}
+            <div class="mt-2">
+              <span class="font-semibold">Données supp.:</span>
+              <pre class="bg-gray-50 p-2 rounded text-xs overflow-auto">{{ entry.additional_data|safe }}</pre>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h2 class="text-lg font-semibold text-orange-600">Modifications</h2>
+        {% if changes %}
+          <div class="overflow-x-auto mt-2">
+            <table class="table w-full">
+              <thead><tr><th>Champ</th><th>Avant</th><th>Après</th></tr></thead>
+              <tbody>
+                {# django-auditlog stores {"field": ["old","new"]} #}
+                {% for field, delta in changes.items %}
+                  <tr>
+                    <td class="font-semibold">{{ field }}</td>
+                    <td class="text-red-700">
+                      {% if delta.0 is not None %}{{ delta.0 }}{% else %}<span class="opacity-60">—</span>{% endif %}
+                    </td>
+                    <td class="text-green-700">
+                      {% if delta.1 is not None %}{{ delta.1 }}{% else %}<span class="opacity-60">—</span>{% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-base-gray">Aucun changement enregistré.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

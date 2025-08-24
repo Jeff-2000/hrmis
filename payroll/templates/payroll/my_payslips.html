@@ -1,0 +1,131 @@
+{% extends 'main/base.html' %}
+{% block title %}Mes Bulletins de Paie{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-file-invoice-dollar"></i> Mes Bulletins
+        </h1>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="flex flex-wrap gap-3 mt-3">
+        <div>
+          <label class="label"><span class="label-text">Année</span></label>
+          <select id="yearSelect" class="select select-bordered select-sm bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300">
+          </select>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Mois</span></label>
+          <select id="monthSelect" class="select select-bordered select-sm bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="flex-1"></div>
+        <button id="btnCsv" class="btn btn-sm bg-blue-100 hover:bg-blue-200 border border-blue-300 text-blue-700">
+          <i class="fas fa-file-csv mr-2"></i>Exporter CSV (année)
+        </button>
+      </div>
+
+      <!-- Grid -->
+      <div id="cardsWrap" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4"></div>
+
+      <!-- Pager -->
+      <div class="mt-3 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-100 hover:bg-blue-200 border border-blue-300 text-blue-700">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-100 hover:bg-blue-200 border border-blue-300 text-blue-700">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const state = { page:1, pageSize:9 };
+  function range(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i);return r;}
+  function now(){ const d=new Date(); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
+  function fmtMoney(v){ return v==null?'—':new Intl.NumberFormat('fr-FR',{style:'currency',currency:'XOF'}).format(v); }
+
+  const yearSel = document.getElementById('yearSelect');
+  const monthSel= document.getElementById('monthSelect');
+  const {y,m}=now();
+  yearSel.innerHTML = range(y-2,y+2).map(v=>`<option value="${v}" ${v===y?'selected':''}>${v}</option>`).join('');
+  monthSel.innerHTML += range(1,12).map(v=>`<option value="${v}">${String(v).padStart(2,'0')}</option>`).join('');
+
+  async function loadSlips(){
+    const params = new URLSearchParams();
+    params.set('page', state.page); params.set('page_size', state.pageSize);
+    if (yearSel.value)  params.set('year', yearSel.value);
+    if (monthSel.value) params.set('month', monthSel.value);
+
+    const wrap = document.getElementById('cardsWrap');
+    wrap.innerHTML = `<div class="col-span-full text-base-gray">Chargement…</div>`;
+
+    try{
+      const r = await fetch(`/api/v1/payslips/me/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok) throw new Error('Erreur de chargement');
+      const data = await r.json(); const rows = data.results || data || [];
+      if (!rows.length){ wrap.innerHTML = `<div class="col-span-full text-base-gray">Aucun bulletin</div>`; return; }
+
+      wrap.innerHTML = rows.map(p=>{
+        const full = `${p.employee?.first_name||''} ${p.employee?.last_name||''}`.trim();
+        return `<div class="card bg-blue-100 border">
+          <div class="card-body">
+            <div class="flex items-center justify-between">
+              <h3 class="card-title text-orange-600">${String(p.run?.month||'').padStart(2,'0')}/${p.run?.year||''}</h3>
+              <span class="badge badge-ghost bg-white text-blue-600 border border-blue-200">${p.currency?.code||'XOF'}</span>
+            </div>
+            <div class="text-sm text-blue-800">${full||'—'}</div>
+            <div class="mt-2">
+              <div class="text-xs">Net à payer</div>
+              <div class="text-xl font-bold">${fmtMoney(p.net_pay)}</div>
+            </div>
+            <div class="card-actions justify-end mt-3">
+              <a class="btn btn-sm bg-blue-300 hover:bg-blue-500" href="/api/v1/payroll/payslips/${p.id}/">Voir</a>
+              <a class="btn btn-sm bg-orange-300 hover:bg-orange-500" href="/api/v1/payslips/${p.id}/pdf/" target="_blank"><i class="fas fa-file-pdf"></i></a>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      document.getElementById('pageInfo').textContent = data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`;
+    }catch(e){ showToast(e.message, 'error'); }
+  }
+
+  // Export CSV for selected year (client-side aggregation)
+  document.getElementById('btnCsv').addEventListener('click', async ()=>{
+    const y = yearSel.value;
+    if (!y){ showToast('Choisissez une année', 'error'); return; }
+    try{
+      // Quick fetch all pages for that year
+      const params = new URLSearchParams(); params.set('year', y); params.set('page_size', 9999);
+      const r = await fetch(`/api/v1/payslips/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if (!r.ok) throw new Error('Chargement impossible');
+      const data = await r.json(); const rows = data.results || data || [];
+      const csv = [
+        ['Période','Brut','Taxable','EE','ER','Impôt','Autres','Net'].join(',')
+      ].concat(rows.map(p=>[
+        `${String(p.run?.month||'').padStart(2,'0')}/${p.run?.year||''}`,
+        p.gross_pay||0, p.taxable_gross||0, p.employee_contrib||0, p.employer_contrib||0, p.income_tax||0, p.other_deductions||0, p.net_pay||0
+      ].join(','))).join('\n');
+      const blob = new Blob([`\uFEFF${csv}`], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=`payslips_${y}.csv`; a.click(); URL.revokeObjectURL(url);
+    }catch(e){ showToast(e.message, 'error'); }
+  });
+
+  // wiring
+  yearSel.addEventListener('change', ()=>{ state.page=1; loadSlips(); });
+  monthSel.addEventListener('change', ()=>{ state.page=1; loadSlips(); });
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){state.page--; loadSlips();}});
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadSlips(); });
+
+  loadSlips();
+})();
+</script>
+{% endblock %}

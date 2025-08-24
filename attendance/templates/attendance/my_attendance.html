@@ -1,0 +1,109 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-calendar-check text-blue-600"></i> Mes Présences
+    </h1>
+
+    <!-- Table -->
+    <div class="table-container bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+        <div class="table-header flex justify-between items-center p-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list mr-2"></i> Mes Enregistrements de Présence</h3>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-3 px-4 text-left text-gray-800">Date</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Heure d'Arrivée</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Heure de Départ</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Statut</th>
+                </tr>
+            </thead>
+            <tbody id="myAttendanceTable"></tbody>
+        </table>
+        <div id="pagination" class="flex justify-between items-center p-4">
+            <div>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" onclick="changePage(-1)" disabled>Précédent</button>
+                <span id="pageInfo" class="text-gray-600"></span>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage" onclick="changePage(1)">Suivant</button>
+            </div>
+            <select id="pageSize" onchange="updatePageSize()" class="select select-bordered border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPage = 1;
+    let pageSize = 10;
+
+    // Load my attendance records
+    async function loadMyAttendance() {
+        try {
+            console.log("Loading page:", currentPage, "URL:", `/api/v1/attendance/mine/api/?page=${currentPage}&page_size=${pageSize}`);
+
+            // const response = await fetch(`/api/v1/attendance/mine/api/?page=${currentPage}&page_size=${pageSize}`, {
+            const response = await fetch(`/api/v1/attendance/mine/?page=${currentPage}&page_size=${pageSize}`, { 
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            const data = await response.json();
+            const tbody = document.getElementById('myAttendanceTable');
+            tbody.innerHTML = data.results.map(record => `
+                <tr class="hover:bg-blue-50 border-b border-gray-200">
+                    <td class="py-3 px-4">${record.date}</td>
+                    <td class="py-3 px-4">${record.check_in || 'N/A'}</td>
+                    <td class="py-3 px-4">${record.check_out || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                        <span class="badge ${record.status === 'present' ? 'bg-green-500' : 'bg-red-500'} text-white">
+                            ${record.status === 'present' ? 'Présent' : 'Absent'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" class="py-3 px-4 text-center text-gray-500">Aucun enregistrement trouvé.</td></tr>';
+
+            const totalPages = Math.ceil(data.count / pageSize);
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage === totalPages;
+        } catch (error) {
+            console.error('Error loading my attendance:', error);
+            showToast(`Erreur lors du chargement des présences: ${error.message}`, 'error');
+        }
+    }
+
+    function updatePageSize() {
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadMyAttendance();
+    }
+
+    function changePage(delta) {
+        // Don't decrement below 1
+        if (delta < 0 && currentPage <= 1) return;
+        // Don't increment beyond totalPages (need to know totalPages first)
+        const pageInfo = document.getElementById('pageInfo').textContent;
+        // Extract totalPages from text like "Page 1 sur 3"
+        const match = pageInfo.match(/Page \d+ sur (\d+)/);
+        let totalPages = 1;
+        if (match) totalPages = parseInt(match[1], 10);
+
+        if (delta > 0 && currentPage >= totalPages) return;
+
+        currentPage += delta;
+        loadMyAttendance();
+    }
+
+
+    document.addEventListener('DOMContentLoaded', loadMyAttendance);
+</script>
+{% endblock %}

@@ -1,0 +1,522 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-green-500 max-w-5xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-orange-600 uppercase flex items-center gap-2">
+                <i class="fas fa-users text-green-500"></i> Liste des Employés
+            </h1>
+            {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                <a href="{% url 'employee_create' %}" class="btn btn-primary bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg px-4 py-2">
+                    <i class="fas fa-plus mr-2"></i> Ajouter Employé
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="relative mb-6 max-w-md">
+            <input
+                type="text"
+                id="employeeSearch"
+                placeholder="Rechercher un employé..."
+                class="w-full pl-10 pr-4 py-2 rounded-lg 
+                    bg-white text-black 
+                    border border-orange-500 
+                    focus:border-orange-600 focus:ring focus:ring-orange-200 focus:ring-opacity-50 
+                    placeholder-gray-500"
+                onkeyup="searchEmployees()"
+            />
+            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-500"></i>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="table w-full bg-white border border-gray-200">
+                <thead>
+                    <tr class="bg-gradient-to-r from-orange-600 to-green-600 text-black uppercase text-sm font-semibold">
+                        <th class="py-3 px-4">ID</th>
+                        <th class="py-3 px-4">Nom Complet</th>
+                        <th class="py-3 px-4">Grade</th>
+                        <th class="py-3 px-4">Département</th>
+                        <th class="py-3 px-4">Statut</th>
+                        <th class="py-3 px-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="employeesTable" class="text-gray-900 bg-white">
+                    {% for emp in employees %}
+                    <tr class="hover:bg-orange-100 border-b border-gray-200">
+                        <td class="py-3 px-4">{{ emp.id|slice:":8" }}...</td>
+                        <td class="py-3 px-4">{{ emp.first_name|default:'N/A' }} {{ emp.last_name|default:'N/A' }}</td>
+                        <td class="py-3 px-4"><span class="badge bg-orange-600 text-white">{{ emp.grade.code|default:'N/A' }}</span></td>
+                        <td class="py-3 px-4">{{ emp.department.name|default:'N/A' }}</td>
+                        <td class="py-3 px-4"><span class="badge {% if emp.status == 'actif' %}bg-green-600{% else %}bg-red-600{% endif %} text-white">{{ emp.status|default:'N/A' }}</span></td>
+                        <td class="py-3 px-4">
+                            <div class="flex gap-2">
+                                <button class="btn btn-sm btn-ghost text-gray-600 hover:bg-gray-200" onclick="viewEmployee('{{ emp.id }}')">
+                                    <i class="fas fa-eye text-green-500 bg-green-500"></i>
+                                </button>
+                                {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                                <button class="btn btn-sm bg-orange-600 hover:bg-orange-700 text-white" onclick="editEmployee('{{ emp.id }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm bg-red-600 hover:bg-red-700 text-white" onclick="confirmDelete('{{ emp.id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-3 px-4 text-center text-gray-500">Aucun employé trouvé.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="flex justify-between items-center mt-4">
+                <div class="flex items-center gap-2">
+                    <button class="btn btn-sm bg-orange-600 hover:bg-orange-700 text-white disabled:bg-orange-400 disabled:text-white" id="prevPage" onclick="changePage(-1)" {% if not page_obj.has_previous %}disabled{% endif %}>Précédent</button>
+                    <span id="pageInfo">Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</span>
+                    <button class="btn btn-sm bg-green-600 hover:bg-green-700 text-white disabled:bg-green-400 disabled:text-white" id="nextPage" onclick="changePage(1)" {% if not page_obj.has_next %}disabled{% endif %}>Suivant</button>
+                </div>
+                <select id="pageSize" onchange="updatePageSize()" class="select select-bordered w-24 border-orange-400 focus:border-orange-600 text-gray-900 bg-white">
+                    <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .modal-box { max-height: 80vh; overflow-y: auto; }
+    .toast.hide { animation: fadeOut 0.5s forwards; }
+    @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+</style>
+<script>
+    let currentPage = {{ page_obj.number|default:1 }};
+    let pageSize = {{ page_size|default:10 }};
+    let searchQuery = '{{ search|default:"" }}';
+
+    // Get CSRF token from cookie
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Custom ShowMessage for dialogs
+    function ShowMessage({ title, message, type = 'info', buttons = [], onClose = null }) {
+        const modal = document.createElement('dialog');
+        modal.className = 'modal';
+        const colors = {
+            info: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-600', icon: 'fa-info-circle text-blue-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' },
+            error: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-600', icon: 'fa-exclamation-circle text-orange-600' },
+            confirm: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-600', icon: 'fa-question-circle text-yellow-600' }
+        };
+        const { bg, text, border, icon } = colors[type] || colors.info;
+        modal.innerHTML = `
+            <div class="modal-box ${bg} ${text} border-l-4 ${border} p-6">
+                <div class="flex items-start">
+                    <i class="fas ${icon} mt-1 mr-3 text-2xl"></i>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold mb-2">${title}</h2>
+                        <p class="text-sm">${message}</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    ${buttons.map(btn => `
+                        <button class="btn ${btn.className || 'btn-ghost text-gray-600 hover:bg-gray-200'}" onclick="${btn.onclick}">
+                            ${btn.label}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.showModal();
+        modal.addEventListener('close', () => {
+            modal.remove();
+            if (onClose) onClose();
+        });
+        return modal;
+    }
+
+    // Toast notification
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-600', icon: 'fa-exclamation-circle text-orange-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1">
+                <p class="text-sm font-medium">${message}</p>
+            </div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.parentElement.classList.add('hide')">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    function searchEmployees() {
+        searchQuery = document.getElementById('employeeSearch').value;
+        currentPage = 1;
+        loadEmployees();
+    }
+
+    function updatePageSize() {
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadEmployees();
+    }
+
+    function changePage(delta) {
+        currentPage += delta;
+        loadEmployees();
+    }
+
+    async function loadEmployees() {
+        try {
+            const url = `/api/v1/employees/?page=${currentPage}&page_size=${pageSize}&search=${encodeURIComponent(searchQuery)}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            const contentType = response.headers.get('content-type');
+
+            // For error cases, read body as text
+            if (!response.ok) {
+                const errorText = await response.text();  // <-- Only for error case
+                throw new Error(`API error (${response.status}): ${errorText}`);
+            }
+
+            if (!contentType || !contentType.includes('application/json')) {
+                const nonJsonText = await response.text();  // <-- Only for this case
+                throw new Error(`Invalid response format: Expected JSON, got ${contentType}. Response: ${nonJsonText}`);
+            }
+
+            // Otherwise, it's safe to do .json() here — and ONLY here!
+            const data = await response.json();
+
+            const tbody = document.getElementById('employeesTable');
+            tbody.innerHTML = data.results.map(emp => `
+                <tr class="hover:bg-orange-100 border-b border-gray-200">
+                    <td class="py-3 px-4">${emp.id ? emp.id.substring(0, 8) + '...' : 'N/A'}</td>
+                    <td class="py-3 px-4">${emp.first_name || 'N/A'} ${emp.last_name || 'N/A'}</td>
+                    <td class="py-3 px-4"><span class="badge bg-orange-600 text-white">${emp.grade ? emp.grade.code : 'N/A'}</span></td>
+                    <td class="py-3 px-4">${emp.department ? emp.department.name : 'N/A'}</td>
+                    <td class="py-3 px-4"><span class="badge ${emp.status === 'actif' ? 'bg-green-600' : 'bg-red-600'} text-white">${emp.status || 'N/A'}</span></td>
+                    <td class="py-3 px-4">
+                        <div class="flex gap-2">
+                            <button class="btn btn-sm btn-ghost text-gray-600 hover:bg-gray-200" onclick="viewEmployee('${emp.id || ''}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                            <button class="btn btn-sm bg-orange-600 hover:bg-orange-700 text-white" onclick="editEmployee('${emp.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm bg-red-600 hover:bg-red-700 text-white" onclick="confirmDelete('${emp.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="6" class="py-3 px-4 text-center text-gray-500">Aucun employé trouvé.</td></tr>';
+
+            const totalPages = data.num_pages;
+            document.getElementById('pageInfo').textContent = `Page ${data.page} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = data.page === 1;
+            document.getElementById('nextPage').disabled = data.page === totalPages;
+        } catch (error) {
+            console.error('Error loading employees:', error);
+            showToast(`Erreur lors du chargement des employés: ${error.message}`, 'error');
+        }
+    }
+
+
+    async function viewEmployee(id) {
+        if (!id) {
+            showToast('ID de l\'employé manquant', 'error');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/v1/employees/?id=${id}`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type');
+
+            if (!response.ok) {
+                const responseText = await response.text();
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                throw new Error(`API error (${response.status}): ${responseText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const responseText = await response.text();
+                throw new Error(`Invalid response format: Expected JSON, got ${contentType}. Response: ${responseText}`);
+            }
+
+            const data = await response.json();
+            const emp = data.results[0];
+            ShowMessage({
+                title: 'Détails de l\'Employé',
+                message: `
+                    <div class="grid grid-cols-1 md:grid-cols-[100px_1fr] gap-4 mb-6">
+                        <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-2xl">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">${emp.first_name || 'N/A'} ${emp.last_name || 'N/A'}</h3>
+                            <p><span class="badge ${emp.status === 'actif' ? 'bg-green-600' : 'bg-red-600'} text-white">${emp.status || 'N/A'}</span></p>
+                            <p class="text-gray-600">${emp.department ? emp.department.name : 'N/A'} • ${emp.grade ? emp.grade.code : 'N/A'}</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <h4 class="text-md font-semibold text-gray-800">Informations Personnelles</h4>
+                            <p><strong>Genre:</strong> ${emp.gender === 'M' ? 'Masculin' : emp.gender === 'F' ? 'Féminin' : 'Non spécifié'}</p>
+                            <p><strong>Date de Naissance:</strong> ${emp.date_of_birth || 'Non spécifié'}</p>
+                            <p><strong>Nationalité:</strong> ${emp.nationality || 'Non spécifié'}</p>
+                        </div>
+                        <div>
+                            <h4 class="text-md font-semibold text-gray-800">Informations Professionnelles</h4>
+                            <p><strong>Type:</strong> ${emp.employment_type || 'Non spécifié'}</p>
+                            <p><strong>Poste:</strong> ${emp.position || 'Non spécifié'}</p>
+                            <p><strong>Date d'Embauche:</strong> ${emp.date_joined || 'Non spécifié'}</p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <h4 class="text-md font-semibold text-gray-800">Contact</h4>
+                        <p><strong>Téléphone:</strong> ${emp.contact || 'Non spécifié'}</p>
+                        <p><strong>Région:</strong> ${emp.region || 'Non spécifié'}</p>
+                    </div>
+                `,
+                type: 'info',
+                buttons: [
+                    {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                    { label: 'Modifier', className: 'bg-orange-600 hover:bg-orange-700 text-white', onclick: 'closeModal();editEmployee(\'' + emp.id + '\')' },
+                    {% endif %}
+                    { label: 'Fermer', className: 'btn-ghost text-gray-600 hover:bg-gray-200', onclick: 'closeModal()' }
+                ]
+            });
+        } catch (error) {
+            console.error('Error viewing employee:', error);
+            showToast(`Erreur lors du chargement des détails: ${error.message}`, 'error');
+        }
+    }
+
+
+    function confirmDelete(id) {
+        if (!id) {
+            showToast('ID de l\'employé manquant', 'error');
+            return;
+        }
+        ShowMessage({
+            title: 'Confirmer la Suppression',
+            message: 'Êtes-vous sûr de vouloir supprimer cet employé ? Cette action est irréversible.',
+            type: 'confirm',
+            buttons: [
+                { label: 'Supprimer', className: 'bg-red-600 hover:bg-red-700 text-white', onclick: `closeModal();deleteEmployee('${id}')` },
+                { label: 'Annuler', className: 'btn-ghost text-gray-600 hover:bg-gray-200', onclick: 'closeModal()' }
+            ]
+        });
+    }
+
+    async function deleteEmployee(id) {
+        try {
+            const response = await fetch(`/api/v1/employees/delete/${id}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type');
+            const responseText = await response.text();
+            console.log('Delete Response:', responseText, 'Content-Type:', contentType);
+            if (!response.ok) {
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                if (response.status === 403) {
+                    showToast('Permission refusée', 'error');
+                    return;
+                }
+                throw new Error(`API error (${response.status}): ${responseText}`);
+            }
+            showToast('Employé supprimé avec succès!', 'success');
+            loadEmployees();
+        } catch (error) {
+            console.error('Error deleting employee:', error);
+            showToast(`Erreur lors de la suppression de l'employé: ${error.message}`, 'error');
+        }
+    }
+
+    async function editEmployee(id) {
+        if (!id) {
+            showToast('ID de l\'employé manquant', 'error');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/v1/employees/?id=${id}`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type');
+
+            // Only read body as text on error (for debugging/logging)
+            if (!response.ok) {
+                const responseText = await response.text();
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                throw new Error(`API error (${response.status}): ${responseText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const responseText = await response.text();
+                throw new Error(`Invalid response format: Expected JSON, got ${contentType}. Response: ${responseText}`);
+            }
+
+            // Only now read JSON body!
+            const data = await response.json();
+            const emp = data.results[0];
+            ShowMessage({
+                title: 'Modifier l\'Employé',
+                message: `
+                    <form id="editEmployeeForm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-control">
+                                <label class="label"><span class="label-text font-semibold">Prénom</span></label>
+                                <input type="text" name="first_name" value="${emp.first_name || ''}" class="input input-bordered w-full" required>
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text font-semibold">Nom</span></label>
+                                <input type="text" name="last_name" value="${emp.last_name || ''}" class="input input-bordered w-full" required>
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text font-semibold">Genre</span></label>
+                                <select name="gender" class="select select-bordered w-full">
+                                    <option value="M" ${emp.gender === 'M' ? 'selected' : ''}>Masculin</option>
+                                    <option value="F" ${emp.gender === 'F' ? 'selected' : ''}>Féminin</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text font-semibold">Statut</span></label>
+                                <select name="status" class="select select-bordered w-full">
+                                    <option value="actif" ${emp.status === 'actif' ? 'selected' : ''}>Actif</option>
+                                    <option value="inactif" ${emp.status === 'inactif' ? 'selected' : ''}>Inactif</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text font-semibold">Type d'emploi</span></label>
+                                <input type="text" name="employment_type" value="${emp.employment_type || ''}" class="input input-bordered w-full">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text font-semibold">Poste</span></label>
+                                <input type="text" name="position" value="${emp.position || ''}" class="input input-bordered w-full">
+                            </div>
+                        </div>
+                    </form>
+                `,
+                type: 'info',
+                buttons: [
+                    { label: 'Enregistrer', className: 'bg-green-600 hover:bg-green-700 text-white', onclick: `closeModal();saveEmployee('${emp.id}')` },
+                    { label: 'Annuler', className: 'btn-ghost text-gray-600 hover:bg-gray-200', onclick: 'closeModal()' }
+                ]
+            });
+        } catch (error) {
+            console.error('Error fetching employee for edit:', error);
+            showToast(`Erreur lors du chargement des données: ${error.message}`, 'error');
+        }
+    }
+
+
+    async function saveEmployee(id) {
+        const form = document.getElementById('editEmployeeForm');
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { data[key] = value; });
+        try {
+            const response = await fetch(`/api/v1/employees/edit/${id}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            const contentType = response.headers.get('content-type');
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.log('Error Response:', errorText, 'Content-Type:', contentType);
+                throw new Error(`API error (${response.status}): ${errorText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const nonJsonText = await response.text();
+                throw new Error(`Invalid response format: Expected JSON, got ${contentType}. Response: ${nonJsonText}`);
+            }
+
+            // Success branch: do NOT use responseText, only data!
+            const respData = await response.json(); // If you need the actual API response, use respData
+            // console.log('Edit Response:', respData, 'Content-Type:', contentType);
+
+            showToast('Employé mis à jour avec succès!', 'success');
+            loadEmployees();
+        } catch (error) {
+            console.error('Error saving employee:', error);
+            showToast(`Erreur lors de la mise à jour de l'employé: ${error.message}`, 'error');
+        }
+    }
+
+    function closeModal() {
+        const modal = document.querySelector('.modal');
+        if (modal) modal.close();
+    }
+
+    document.addEventListener('DOMContentLoaded', loadEmployees);
+</script>
+{% endblock %}

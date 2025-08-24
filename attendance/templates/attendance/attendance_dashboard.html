@@ -1,0 +1,388 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+{% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-calendar-check text-blue-600"></i> Tableau de Bord des Présences
+    </h1>
+
+    <!-- Loading State -->
+    <div id="loading" class="flex justify-center items-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+    </div>
+
+    <!-- Daily Overview -->
+    <div id="dashboardGrid" class="dashboard-grid grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 hidden">
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-green-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-green-500 text-white rounded-full p-3">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Présents</h3>
+                    <div class="stat-number text-2xl font-bold text-green-600" id="presentCount">0</div>
+                    <div class="stat-label text-gray-600">Aujourd'hui</div>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-red-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-red-500 text-white rounded-full p-3">
+                    <i class="fas fa-user-times"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Absents</h3>
+                    <div class="stat-number text-2xl font-bold text-red-600" id="absentCount">0</div>
+                    <div class="stat-label text-gray-600">Aujourd'hui</div>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-yellow-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-yellow-500 text-white rounded-full p-3">
+                    <i class="fas fa-user-clock"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">En Congé</h3>
+                    <div class="stat-number text-2xl font-bold text-yellow-600" id="leaveCount">0</div>
+                    <div class="stat-label text-gray-600">Aujourd'hui</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar View -->
+    <div class="card bg-white shadow-xl rounded-lg p-6 mb-8 border-l-4 border-blue-600">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-calendar mr-2"></i> Vue Calendrier</h3>
+            <div class="flex gap-2">
+                <button id="prevMonth" class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white"><i class="fas fa-chevron-left"></i></button>
+                <span id="calendarMonth" class="text-gray-800 font-semibold"></span>
+                <button id="nextMonth" class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+        <div id="calendar" class="w-full"></div>
+    </div>
+
+    <!-- Attendance Trends -->
+    <div class="card bg-white shadow-xl rounded-lg p-6 mb-8 border-l-4 border-blue-600">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fas fa-chart-line mr-2"></i> Tendances des Absences</h3>
+        <canvas id="absenceTrendChart" height="100"></canvas>
+    </div>
+</div>
+{% else %}
+<div class="container mx-auto px-4 py-6">
+    <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-red-600">
+        <h3 class="text-lg font-semibold text-gray-800">Accès Refusé</h3>
+        <p class="text-gray-600">Vous n'avez pas la permission d'accéder à ce tableau de bord.</p>
+    </div>
+</div>
+{% endif %}
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+    // Get CSRF token
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Toast notification
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1">
+                <p class="text-sm font-medium">${message}</p>
+            </div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.parentElement.classList.add('hide')">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    // Custom ShowMessage for dialogs
+    function ShowMessage({ title, message, type = 'info', buttons = [], onClose = null }) {
+        const modal = document.createElement('dialog');
+        modal.className = 'modal';
+        const colors = {
+            info: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-600', icon: 'fa-info-circle text-blue-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' },
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            confirm: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-600', icon: 'fa-question-circle text-yellow-600' }
+        };
+        const { bg, text, border, icon } = colors[type] || colors.info;
+        modal.innerHTML = `
+            <div class="modal-box ${bg} ${text} border-l-4 ${border} p-6">
+                <div class="flex items-start">
+                    <i class="fas ${icon} mt-1 mr-3 text-2xl"></i>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold mb-2">${title}</h2>
+                        <p class="text-sm">${message}</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    ${buttons.map(btn => `
+                        <button class="btn ${btn.className || 'btn-ghost text-gray-600 hover:bg-gray-200'}" onclick="${btn.onclick}">
+                            ${btn.label}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.showModal();
+        modal.addEventListener('close', () => {
+            modal.remove();
+            if (onClose) onClose();
+        });
+        return modal;
+    }
+
+    function closeModal() {
+        const modal = document.querySelector('.modal');
+        if (modal) modal.close();
+    }
+
+    // Load dashboard data
+    async function loadDashboardData(year, month) {
+        try {
+            const response = await fetch(`/api/v1/attendance/summary/?year=${year}&month=${month + 1}`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (response.status === 401) {
+                showToast('Session expirée, veuillez vous reconnecter.', 'error');
+                // setTimeout(() => { window.location.href = "{% url 'login' %}"; }, 2000);
+                return;
+            }
+
+            if (response.status === 403) {
+                showToast('Permission refusée : vous devez être HR ou ADMIN.', 'error');
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`Erreur API (${response.status})`);
+            }
+            const data = await response.json();
+            document.getElementById('presentCount').textContent = data.present_count || 0;
+            document.getElementById('absentCount').textContent = data.absent_count || 0;
+            document.getElementById('leaveCount').textContent = data.leave_count || 0;
+
+            // Show dashboard content
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('dashboardGrid').classList.remove('hidden');
+
+            // Initialize calendar
+            initializeCalendar(data.calendar_data || [], year, month);
+
+            // Initialize trend chart
+            initializeTrendChart(data.trend_data || []);
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            showToast(`Erreur lors du chargement du tableau de bord : ${error.message}`, 'error');
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('dashboardGrid').classList.remove('hidden');
+            // Fallback data
+            initializeCalendar([], year, month);
+            initializeTrendChart([]);
+        }
+    }
+
+    // Initialize calendar
+    function initializeCalendar(data, year, month) {
+        const calendarEl = document.getElementById('calendar');
+        const monthNames = [
+            'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+            'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+        ];
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDay = new Date(year, month, 1).getDay();
+        document.getElementById('calendarMonth').textContent = `${monthNames[month]} ${year}`;
+
+        let html = '<div class="grid grid-cols-7 gap-1 text-center">';
+        const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+        // Header
+        html += days.map(day => `<div class="font-semibold text-gray-800">${day}</div>`).join('');
+
+        // Days (blank cells before the first day)
+        for (let i = 0; i < firstDay; i++) {
+            html += '<div></div>';
+        }
+        // Real days
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+            // Get full stats for the day (fallbacks to 0s if not present)
+            const dayData = data.find(d => d.date === dateStr) || {
+                present: 0, absent: 0, leave: 0,
+                present_rate: 0, absent_rate: 0, leave_rate: 0
+            };
+            const color =
+                dayData.absent_rate > 0.5 ? 'bg-red-200'
+            : dayData.absent_rate > 0.2 ? 'bg-yellow-200'
+            : 'bg-green-200';
+
+            // All info is embedded in data-* attributes for JS use
+            html += `<div class="calendar-cell ${color} p-2 rounded cursor-pointer relative"
+                data-date="${dateStr}"
+                data-present="${dayData.present}"
+                data-absent="${dayData.absent}"
+                data-leave="${dayData.leave}"
+                data-present-rate="${(dayData.present_rate * 100).toFixed(0)}"
+                data-absent-rate="${(dayData.absent_rate * 100).toFixed(0)}"
+                data-leave-rate="${(dayData.leave_rate * 100).toFixed(0)}"
+                >${day}</div>`;
+        }
+        html += '</div>';
+        calendarEl.innerHTML = html;
+
+        // Tooltip code
+        let calendarTooltip = null;
+
+        function showCalendarTooltip(e) {
+            const cell = e.currentTarget;
+            // Remove any existing tooltip
+            hideCalendarTooltip();
+
+            const present = cell.dataset.present;
+            const absent = cell.dataset.absent;
+            const leave = cell.dataset.leave;
+            const presentRate = cell.dataset.presentRate;
+            const absentRate = cell.dataset.absentRate;
+            const leaveRate = cell.dataset.leaveRate;
+            const date = cell.dataset.date;
+
+            calendarTooltip = document.createElement('div');
+            calendarTooltip.className = "z-50 absolute p-2 rounded shadow-lg bg-white border text-xs tooltip-box";
+            calendarTooltip.style.left = "50%";
+            calendarTooltip.style.top = "-2.5rem";
+            calendarTooltip.style.transform = "translate(-50%, -100%)";
+            calendarTooltip.style.minWidth = "135px";
+            calendarTooltip.innerHTML = `
+                <div class="text-xs text-gray-800 font-semibold mb-1">${date}</div>
+                <div><span class="text-green-700 font-bold">Présents:</span> ${present} <span class="text-gray-500">(${presentRate}%)</span></div>
+                <div><span class="text-red-700 font-bold">Absents:</span> ${absent} <span class="text-gray-500">(${absentRate}%)</span></div>
+                <div><span class="text-yellow-700 font-bold">Congés:</span> ${leave} <span class="text-gray-500">(${leaveRate}%)</span></div>
+            `;
+            cell.appendChild(calendarTooltip);
+        }
+        function hideCalendarTooltip() {
+            document.querySelectorAll('.tooltip-box').forEach(el => el.remove());
+        }
+
+        // Add events to all days
+        document.querySelectorAll('.calendar-cell').forEach(cell => {
+            cell.addEventListener('mouseenter', showCalendarTooltip);
+            cell.addEventListener('mouseleave', hideCalendarTooltip);
+            cell.addEventListener('click', updateTrendOnDayClick);
+        });
+    }
+
+    // Called when a calendar cell is clicked
+    async function updateTrendOnDayClick(e) {
+        const cell = e.currentTarget;
+        const date = cell.dataset.date;
+        try {
+            const response = await fetch(`/api/v1/attendance/summary/?date=${date}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement des tendances');
+            const data = await response.json();
+            initializeTrendChart(data.trend_data); // This redraws the trend chart only!
+        } catch (error) {
+            showToast("Erreur: " + error.message);
+        }
+    }
+    
+    function hideCalendarTooltip(e) {
+        if (calendarTooltip) {
+            calendarTooltip.remove();
+            calendarTooltip = null;
+        }
+    }
+
+    // Initialize trend chart
+    function initializeTrendChart(data) {
+        const ctx = document.getElementById('absenceTrendChart').getContext('2d');
+        // Destroy existing chart if any
+        if (window.absenceChart) {
+            window.absenceChart.destroy();
+        }
+        window.absenceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.length ? data.map(d => d.date) : ['Aucune donnée'],
+                datasets: [{
+                    label: 'Taux d\'absence',
+                    data: data.length ? data.map(d => (d.absence_rate * 100).toFixed(1)) : [0],
+                    borderColor: '#e3342f',
+                    fill: false,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true, max: 100, title: { display: true, text: 'Taux d\'absence (%)' } },
+                    x: { title: { display: true, text: 'Date' } }
+                }
+            }
+        });
+    }
+
+    // Month navigation
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth();
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadDashboardData(currentYear, currentMonth);
+        document.getElementById('prevMonth').addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            loadDashboardData(currentYear, currentMonth);
+        });
+        document.getElementById('nextMonth').addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            loadDashboardData(currentYear, currentMonth);
+        });
+    });
+</script>
+{% endblock %}

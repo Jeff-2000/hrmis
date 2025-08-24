@@ -1,0 +1,275 @@
+
+{# templates/accounts/profile.html #}
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 space-y-6">
+  <div class="grid md:grid-cols-3 gap-6">
+    <!-- Card: Identity -->
+    <div class="col-span-1 bg-white rounded-xl shadow shadow-lg shadow-green-500/50 p-6">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-2xl text-blue-700">
+          <i class="fas fa-user"></i>
+        </div>
+        <div>
+          <h2 id="p_fullname" class="text-xl font-semibold text-gray-800">—</h2>
+          <p id="p_role" class="text-gray-500 text-sm">—</p>
+        </div>
+      </div>
+      <div class="mt-4 text-sm text-gray-700 space-y-1">
+        <div><i class="fas fa-envelope mr-2 text-blue-600"></i><span id="p_email">—</span></div>
+        <div><i class="fas fa-phone mr-2 text-blue-600"></i><span id="p_contact">—</span></div>
+        <div><i class="fas fa-briefcase mr-2 text-blue-600"></i>Département: <span id="p_dept">—</span></div>
+        <div><i class="fas fa-sitemap mr-2 text-blue-600"></i>Grade: <span id="p_grade">—</span></div>
+        <div><i class="fas fa-calendar-alt mr-2 text-blue-600"></i>Entrée: <span id="p_joined">—</span></div>
+      </div>
+      <div class="mt-4">
+        <a href="{% url 'general_settings' %}" class="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white">Paramètres</a>
+      </div>
+    </div>
+
+    <!-- Card: KPIs quick -->
+    <div class="col-span-2 bg-white rounded-xl shadow shadow-lg shadow-purple-500/50 p-6">
+      <h3 class="text-lg font-semibold mb-4">Mes indicateurs</h3>
+      <div class="grid sm:grid-cols-4 gap-4">
+        <div class="p-4 bg-blue-50 rounded-lg">
+          <div class="text-xs text-gray-500">Notifications non lues</div>
+          <div id="k_unread" class="text-2xl font-bold">0</div>
+        </div>
+        <div class="p-4 bg-green-50 rounded-lg">
+          <div class="text-xs text-gray-500">Demandes de congé (en attente)</div>
+          <div id="k_leave_pending" class="text-2xl font-bold">0</div>
+        </div>
+        <div class="p-4 bg-amber-50 rounded-lg">
+          <div class="text-xs text-gray-500">Dernier net (paie)</div>
+          <div id="k_last_net" class="text-2xl font-bold">—</div>
+        </div>
+        <div class="p-4 bg-purple-50 rounded-lg">
+          <div class="text-xs text-gray-500">Contrats actifs</div>
+          <div id="k_contracts" class="text-2xl font-bold">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent notifications -->
+  <div class="bg-white rounded-xl shadow shadow-lg shadow-blue-500/40 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Notifications récentes</h3>
+      <a href="{% url 'notification_center' %}" class="text-blue-600 hover:underline">Voir toutes</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-left text-sm text-gray-500 border-b">
+            <th class="py-2">Canal</th>
+            <th class="py-2">Message</th>
+            <th class="py-2">Statut</th>
+            <th class="py-2">Date</th>
+          </tr>
+        </thead>
+        <tbody id="notif_rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Payslips -->
+  <div class="bg-white rounded-xl shadow shadow-lg shadow-red-500/50  p-6">
+    <h3 class="text-lg font-semibold mb-4">Mes bulletins (12 derniers)</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-left text-sm text-gray-500 border-b">
+            <th class="py-2">Période</th>
+            <th class="py-2">Brut</th>
+            <th class="py-2">Net</th>
+            <th class="py-2">État</th>
+            <th class="py-2">PDF</th>
+          </tr>
+        </thead>
+        <tbody id="payslip_rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+(function() {
+  const fmtMoney = (v, currency = 'XOF') => (v == null ? "—" : new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(v));
+  const el = id => document.getElementById(id);
+
+  async function api(url) {
+    try {
+      const r = await fetch(url, { 
+        credentials: 'same-origin', 
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!r.ok) {
+        throw new Error(`Request to ${url} failed with status ${r.status}: ${r.statusText}`);
+      }
+      return await r.json();
+    } catch (e) {
+      console.error(`API error at ${url}:`, e);
+      throw e;
+    }
+  }
+
+  async function loadProfile() {
+    try {
+      // Employee profile
+      const me = await api('/api/v1/employees/me/');
+      el('p_fullname').textContent = `${me.first_name || ''} ${me.last_name || ''}`.trim() || '—';
+      el('p_role').textContent = "{{ request.user.role }}" || '—';
+      el('p_email').textContent = "{{ request.user.email }}" || '—';
+      el('p_contact').textContent = me.contact || '—';
+      el('p_dept').textContent = (me.department && me.department.name) || '—';
+      el('p_grade').textContent = (me.grade && me.grade.code) || '—';
+      el('p_joined').textContent = me.date_joined ? new Date(me.date_joined).toLocaleDateString('fr-FR') : '—';
+
+      // KPIs: Unread notifications
+      try {
+        const unread = await api('/api/v1/notifications/notifications/unread_count/');
+        el('k_unread').textContent = unread.unread || 0;
+      } catch (e) {
+        console.error('Error fetching unread notifications:', e);
+        el('k_unread').textContent = '—';
+      }
+
+      // KPIs: Pending leave requests
+      try {
+        const myLeaves = await api('/api/v1/leave/leave/?status=pending');
+        el('k_leave_pending').textContent = myLeaves.count || (Array.isArray(myLeaves) ? myLeaves.length : 0);
+      } catch (e) {
+        console.error('Error fetching leave requests:', e);
+        el('k_leave_pending').textContent = '—';
+      }
+
+      // KPIs: Last net pay and payslips
+      let payslips = [];
+      try {
+        payslips = await api('/api/v1/payslips/me/?page_size=12');
+        const rows = (payslips.results || payslips || []).map(p => `
+          <tr class="border-b">
+            <td class="py-2">${p.run ? `${String(p.run.month).padStart(2, '0')}/${p.run.year}` : '—'}</td>
+            <td class="py-2">${fmtMoney(p.gross_pay, p.currency || 'XOF')}</td>
+            <td class="py-2">${fmtMoney(p.net_pay, p.currency || 'XOF')}</td>
+            <td class="py-2">${p.finalized ? 'Finalisé' : 'Brouillon'}</td>
+            <td class="py-2">
+              ${p.id ? `<a class="text-blue-600 hover:underline" href="/api/v1/payslips/${p.id}/pdf/" target="_blank">PDF</a>` : '—'}
+            </td>
+          </tr>
+        `).join('');
+        el('payslip_rows').innerHTML = rows || '<tr><td class="py-3 text-gray-500" colspan="5">Aucun bulletin</td></tr>';
+
+        // Set last net pay
+        const last = (payslips.results || payslips || [])[0];
+        el('k_last_net').textContent = last ? fmtMoney(last.net_pay, last.currency || 'XOF') : '—';
+      } catch (e) {
+        console.error('Error fetching payslips:', e);
+        el('payslip_rows').innerHTML = '<tr><td class="py-3 text-gray-500" colspan="5">Erreur de chargement</td></tr>';
+        el('k_last_net').textContent = '—';
+      }
+
+      // KPIs: Active contracts
+      try {
+        const compensation = await api('/api/v1/compensation/?employee=me');
+        el('k_contracts').textContent = compensation.contracts ? compensation.contracts.filter(c => c.is_active).length : '—';
+      } catch (e) {
+        console.error('Error fetching contracts:', e);
+        el('k_contracts').textContent = '—';
+      }
+
+      // Recent notifications (limit 10)
+// Recent notifications (limit 10)
+try {
+  const notifsResp = await api('/api/v1/notifications/notifications/?page=1&page_size=10');
+  // normalize to array safely
+  const notifs = Array.isArray(notifsResp.results) 
+    ? notifsResp.results 
+    : (Array.isArray(notifsResp) ? notifsResp : []);
+
+  el('notif_rows').innerHTML = notifs.length
+    ? notifs.map(n => {
+        const short = (n.message || '').length > 80 
+          ? (n.message.slice(0, 80) + '…') 
+          : (n.message || '');
+        const readCls = n.is_read ? 'bg-white' : 'bg-blue-50';
+        return `
+          <tr class="border-b ${readCls} cursor-pointer" data-id="${n.id}">
+            <td class="py-2">${n.channel || '—'}</td>
+            <td class="py-2">${short}</td>
+            <td class="py-2">${n.status || '—'}</td>
+            <td class="py-2">${n.timestamp ? new Date(n.timestamp).toLocaleString('fr-FR') : '—'}</td>
+          </tr>
+        `;
+      }).join('')
+    : '<tr><td class="py-3 text-gray-500" colspan="4">Aucune notification</td></tr>';
+
+        // Row click => open modal + mark read
+        document.querySelectorAll('#notif_rows tr[data-id]').forEach(tr => {
+          tr.addEventListener('click', async () => {
+            const id = tr.getAttribute('data-id');
+            try {
+              const r = await api(`/api/v1/notifications/notifications/${id}/`);
+              const modal = document.createElement('div');
+              modal.className = 'fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50';
+              modal.innerHTML = `
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative">
+                  <button class="absolute top-3 right-3 text-gray-400 hover:text-gray-600" id="mclose"><i class="fas fa-times"></i></button>
+                  <h4 class="text-lg font-semibold mb-2">Notification</h4>
+                  <div class="text-sm text-gray-500 mb-4">${r.channel || '—'} • ${r.timestamp ? new Date(r.timestamp).toLocaleString('fr-FR') : '—'}</div>
+                  <div class="whitespace-pre-wrap text-gray-800">${r.message || ''}</div>
+                </div>
+              `;
+              document.body.appendChild(modal);
+              modal.querySelector('#mclose').onclick = () => modal.remove();
+
+              // Mark notification as read
+              try {
+                await fetch(`/api/v1/notifications/notifications/${id}/mark_read/`, {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' }
+                });
+                tr.classList.remove('bg-blue-50');
+                el('k_unread').textContent = Math.max(0, parseInt(el('k_unread').textContent || '0', 10) - 1);
+              } catch (e) {
+                console.error('Failed to mark notification as read:', e);
+              }
+            } catch (e) {
+              console.error('Failed to load notification:', e);
+            }
+          });
+        });
+      } catch (e) {
+        console.error('Error fetching notifications:', e);
+        el('notif_rows').innerHTML = '<tr><td class="py-3 text-gray-500" colspan="4">Erreur de chargement</td></tr>';
+      }
+    } catch (e) {
+      console.error('Error loading profile data:', e);
+      el('p_fullname').textContent = 'Erreur de chargement';
+      el('payslip_rows').innerHTML = '<tr><td class="py-3 text-gray-500" colspan="5">Erreur de chargement</td></tr>';
+      el('notif_rows').innerHTML = '<tr><td class="py-3 text-gray-500" colspan="4">Erreur de chargement</td></tr>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadProfile);
+})();
+</script>
+{% endblock %}

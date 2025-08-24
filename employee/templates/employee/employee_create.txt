@@ -1,0 +1,309 @@
+{% extends 'main/base.html' %}
+
+{% block extra_css %}
+<style>
+    /* Ensure the card is readable against the gradient background */
+    .card {
+        background: rgba(255, 255, 255, 0.95); /* Semi-transparent white for contrast */
+        border-radius: 8px;
+        box-shadow: var(--shadow-lg);
+        padding: 2rem;
+        margin: 2rem auto;
+        max-width: 900px;
+    }
+
+    /* Card header styling */
+    .card-header {
+        background: var(--ci-orange);
+        color: var(--ci-white);
+        padding: 1rem;
+        border-radius: 8px 8px 0 0;
+        margin: -2rem -2rem 2rem -2rem; /* Offset parent padding */
+    }
+
+    /* Form group styling */
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: var(--ci-dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--ci-gray);
+        border-radius: 4px;
+        font-size: 1rem;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        background: var(--ci-white);
+        color: var(--ci-dark);
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--ci-orange);
+        box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.2);
+    }
+
+    /* Style for required field labels */
+    .form-group label::after {
+        content: '*';
+        color: var(--ci-orange);
+        margin-left: 0.25rem;
+        display: none; /* Hidden by default */
+    }
+
+    .form-group [required] + label::after {
+        display: inline; /* Show asterisk for required fields */
+    }
+
+    /* Button styling */
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .btn-primary {
+        background: var(--ci-orange);
+        color: var(--ci-white);
+    }
+
+    .btn-primary:hover {
+        background: darken(--ci-orange, 10%);
+        transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+        background: var(--ci-gray);
+        color: var(--ci-white);
+    }
+
+    .btn-secondary:hover {
+        background: darken(--ci-gray, 10%);
+        transform: translateY(-2px);
+    }
+
+    /* Slide-in animation */
+    .slide-in {
+        animation: slideIn 0.5s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .card {
+            padding: 1.5rem;
+            margin: 1rem;
+        }
+
+        .form-group {
+            grid-column: 1 / -1; /* Full width on small screens */
+        }
+
+        [style*="grid-template-columns"] {
+            grid-template-columns: 1fr; /* Single column on small screens */
+        }
+    }
+
+    /* Toast notification styling (for showToast function) */
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 1rem;
+        border-radius: 4px;
+        color: var(--ci-white);
+        box-shadow: var(--shadow);
+        z-index: 1000;
+    }
+
+    .toast.success {
+        background: var(--ci-green);
+    }
+
+    .toast.error {
+        background: var(--ci-orange);
+    }
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="slide-in">
+    <h1><i class="fas fa-user-plus"></i> Ajouter un Nouvel Employé</h1>
+    <div class="card">
+        <div class="card-header">
+            <h3>Formulaire d'Inscription</h3>
+        </div>
+        <form id="employeeForm" onsubmit="submitEmployee(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label for="first_name">Prénom *</label>
+                    <input type="text" class="form-control" id="first_name" name="first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="last_name">Nom *</label>
+                    <input type="text" class="form-control" id="last_name" name="last_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="gender">Genre *</label>
+                    <select class="form-control" id="gender" name="gender" required>
+                        <option value="">Sélectionner...</option>
+                        <option value="M">Masculin</option>
+                        <option value="F">Féminin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="date_of_birth">Date de Naissance</label>
+                    <input type="date" class="form-control" id="date_of_birth" name="date_of_birth">
+                </div>
+                <div class="form-group">
+                    <label for="nationality">Nationalité</label>
+                    <input type="text" class="form-control" id="nationality" name="nationality" value="Ivoirienne">
+                </div>
+                <div class="form-group">
+                    <label for="contact">Contact</label>
+                    <input type="text" class="form-control" id="contact" name="contact" placeholder="+225 XX XX XX XX XX">
+                </div>
+                <div class="form-group">
+                    <label for="employment_type">Type d'Emploi *</label>
+                    <select class="form-control" id="employment_type" name="employment_type" required>
+                        <option value="">Sélectionner...</option>
+                        <option value="Fonctionnaire">Fonctionnaire</option>
+                        <option value="Agent contractuel">Agent contractuel</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="grade_id">Grade</label>
+                    <select class="form-control" id="grade_id" name="grade_id">
+                        <option value="">Sélectionner...</option>
+                        {% for grade in grades %}
+                        <option value="{{ grade.id }}">{{ grade.code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="department_id">Département *</label>
+                    <select class="form-control" id="department_id" name="department_id" required>
+                        <option value="">Sélectionner...</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept.id }}">{{ dept.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="date_joined">Date d'Embauche *</label>
+                    <input type="date" class="form-control" id="date_joined" name="date_joined" required>
+                </div>
+                <div class="form-group">
+                    <label for="base_salary">Salaire de Base</label>
+                    <input type="number" class="form-control" id="base_salary" name="base_salary" placeholder="En FCFA">
+                </div>
+                <div class="form-group">
+                    <label for="position">Position</label>
+                    <input type="text" class="form-control" id="position" name="position">
+                </div>
+                <div class="form-group">
+                    <label for="address">Adresse</label>
+                    <textarea class="form-control" id="address" name="address" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="origin_structure">Structure d'Origine</label>
+                    <input type="text" class="form-control" id="origin_structure" name="origin_structure">
+                </div>
+                <div class="form-group">
+                    <label for="workplace">Lieu de Travail</label>
+                    <input type="text" class="form-control" id="workplace" name="workplace">
+                </div>
+                <div class="form-group">
+                    <label for="region">Région</label>
+                    <input type="text" class="form-control" id="region" name="region">
+                </div>
+                <div class="form-group">
+                    <label for="qualification_category">Catégorie de Qualification</label>
+                    <select class="form-control" id="qualification_category" name="qualification_category">
+                        <option value="">Sélectionner...</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="current_class">Classe Actuelle</label>
+                    <input type="text" class="form-control" id="current_class" name="current_class">
+                </div>
+                <div class="form-group">
+                    <label for="echelon">Échelon</label>
+                    <input type="number" class="form-control" id="echelon" name="echelon">
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                <a href="{% url 'employee_list' %}" class="btn btn-secondary">Annuler</a>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function submitEmployee(event) {
+    event.preventDefault();
+    const form = document.getElementById('employeeForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+
+    try {
+        const response = await fetch('/api/employees/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token'),
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(JSON.stringify(errorData));
+        }
+        showToast('Employé ajouté avec succès!', 'success');
+        window.location.href = '{% url "employee_list" %}';
+    } catch (error) {
+        showToast('Erreur lors de l\'ajout de l\'employé: ' + error.message, 'error');
+    }
+}
+</script>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+

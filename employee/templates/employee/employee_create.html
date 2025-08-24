@@ -1,0 +1,310 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-orange-600 max-w-5xl mx-auto">
+        <h1 class="text-2xl font-bold text-orange-600 uppercase flex items-center gap-2 mb-6">
+            <i class="fas fa-user-plus text-green-600"></i> Ajouter un Employé
+        </h1>
+        <form id="employeeCreateForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% csrf_token %}
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Prénom</span></label>
+                <input type="text" name="first_name" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Nom</span></label>
+                <input type="text" name="last_name" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Genre</span></label>
+                <select name="gender" class="select select-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" required>
+                    <option value="" disabled selected>Sélectionner</option>
+                    <option value="M">Masculin</option>
+                    <option value="F">Féminin</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Date de Naissance</span></label>
+                <input type="date" name="date_of_birth" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Nationalité</span></label>
+                <input type="text" name="nationality" value="Ivorian" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Contact (Téléphone/Email)</span></label>
+                <input type="text" name="contact" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Type d'Emploi</span></label>
+                <input type="text" name="employment_type" placeholder="e.g., Fonctionnaire" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Grade</span></label>
+                <select name="grade_id" id="gradeSelect" class="select select-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+                    <option value="" disabled selected>Sélectionner</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Département</span></label>
+                <select name="department_id" id="departmentSelect" class="select select-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+                    <option value="" disabled selected>Sélectionner</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Poste</span></label>
+                <input type="text" name="position" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Date d'Embauche</span></label>
+                <input type="date" name="date_joined" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Statut</span></label>
+                <select name="status" class="select select-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800" required>
+                    <option value="actif">Actif</option>
+                    <option value="inactif">Inactif</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Structure d'Origine</span></label>
+                <input type="text" name="origin_structure" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Lieu de Travail</span></label>
+                <input type="text" name="workplace" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Région</span></label>
+                <input type="text" name="region" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Catégorie de Qualification</span></label>
+                <select name="qualification_category" class="select select-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+                    <option value="" disabled selected>Sélectionner</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Classe Actuelle</span></label>
+                <input type="text" name="current_class" placeholder="e.g., 1ère classe" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Échelon</span></label>
+                <input type="number" name="echelon" min="0" class="input input-bordered w-full border-orange-500 focus:border-orange-600 bg-white text-gray-800">
+            </div>
+            <div class="col-span-2 flex justify-end gap-4 mt-6">
+                <button type="submit" class="btn bg-green-500 hover:bg-green-600 text-white">Enregistrer</button>
+                <a href="{% url 'employee_list' %}" class="btn btn-ghost text-gray-600 hover:bg-gray-100">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Grade color function
+    function getGradeColorClass(code) {
+        switch (code) {
+            case "A1": return "bg-orange-500";
+            case "A2": return "bg-orange-400";
+            case "A3": return "bg-orange-300";
+            case "A4": return "bg-orange-200";
+            case "A5": return "bg-orange-100";
+            case "A6": return "bg-orange-50";
+            case "B1": return "bg-blue-500";
+            case "B2": return "bg-blue-400";
+            case "B3": return "bg-blue-300";
+            case "B4": return "bg-blue-200";
+            case "B5": return "bg-blue-100";
+            case "B6": return "bg-blue-50";
+            case "C1": return "bg-green-500";
+            case "C2": return "bg-green-400";
+            case "C3": return "bg-green-300";
+            case "C4": return "bg-green-200";
+            case "C5": return "bg-green-100";
+            case "C6": return "bg-green-50";
+            case "D1": return "bg-purple-500";
+            case "D2": return "bg-purple-400";
+            case "D3": return "bg-purple-300";
+            case "D4": return "bg-purple-200";
+            case "D5": return "bg-purple-100";
+            case "D6": return "bg-purple-50";
+            case "E1": return "bg-red-500";
+            case "E2": return "bg-red-400";
+            case "E3": return "bg-red-300";
+            case "E4": return "bg-red-200";
+            case "E5": return "bg-red-100";
+            case "E6": return "bg-red-50";
+            default:   return "bg-gray-500";
+        }
+    }
+
+    // Get CSRF token from cookie
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Toast notification
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1">
+                <p class="text-sm font-medium">${message}</p>
+            </div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    // Load grades and departments for dropdowns
+    async function loadDropdowns() {
+        try {
+            // Load grades
+            const gradeResponse = await fetch('/api/v1/employees/grades/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!gradeResponse.ok) throw new Error('Erreur lors du chargement des grades');
+            const gradeData = await gradeResponse.json();
+            const gradeSelect = document.getElementById('gradeSelect');
+            gradeData.results.forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade.id;
+                option.innerHTML = `<span class="badge ${getGradeColorClass(grade.code)} text-white">${grade.code}</span>`;
+                gradeSelect.appendChild(option);
+            });
+
+            // Load departments
+            const deptResponse = await fetch('/api/v1/employees/departments/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!deptResponse.ok) throw new Error('Erreur lors du chargement des départements');
+            const deptData = await deptResponse.json();
+            const deptSelect = document.getElementById('departmentSelect');
+            deptData.results.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept.id;
+                option.textContent = dept.name;
+                deptSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading dropdowns:', error);
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+
+    function formHasErrors(form) {
+        // This is basic. You could get fancy.
+        const requiredFields = ['first_name', 'last_name', 'gender', 'employment_type', 'nationality'];
+        for (const field of requiredFields) {
+            const value = form.elements[field] ? form.elements[field].value : null;
+            if (!value || value.trim() === '') return field;
+        }
+        return null;
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDropdowns();
+        const form = document.getElementById('employeeCreateForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitEmployeeForm();
+            });
+        }
+    });
+
+    // Submit employee form
+    async function submitEmployeeForm() {
+        const form = document.getElementById('employeeCreateForm');
+        const errorField = formHasErrors(form);
+        if (errorField) {
+            showToast(`Le champ obligatoire "${errorField}" est vide.`, 'error');
+            return;
+        }
+        
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { 
+            // Special handling for date fields
+            if (key === 'date_joined' || key === 'date_of_birth') {
+                data[key] = value ? new Date(value).toISOString().split('T')[0] : null;
+            } else {
+                // Convert empty strings to null for optional fields
+                data[key] = value.trim() === '' ? null : value;
+            }
+        });
+
+        try {
+            const response = await fetch('{% url "employee_create" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const responseData = await response.json();
+            
+            if (!response.ok) {
+                // Improved error handling
+                let errorMessage = 'Erreur lors de la création de l\'employé';
+                if (responseData.error) {
+                    if (typeof responseData.error === 'object') {
+                        errorMessage = Object.entries(responseData.error)
+                            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+                            .join('; ');
+                    } else {
+                        errorMessage = responseData.error;
+                    }
+                }
+                throw new Error(errorMessage);
+            }
+
+            showToast('Employé créé avec succès!', 'success');
+            setTimeout(() => window.location.href = '{% url "employee_list" %}', 2000);
+        } catch (error) {
+            console.error('Full error details:', error);
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDropdowns);
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends 'main/base.html' %}
+{% block title %}Mes Contrats{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-file-contract"></i> Mes Contrats
+        </h1>
+      </div>
+
+      <div class="overflow-x-auto mt-4 bg-gray-50">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap text-blue-600">Type</th>
+              <th class="whitespace-nowrap text-blue-600">Début</th>
+              <th class="whitespace-nowrap text-blue-600">Fin</th>
+              <th class="whitespace-nowrap text-blue-600">Statut</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Salaire</th>
+            </tr>
+          </thead>
+          <tbody id="tBody">
+            <tr><td colspan="5" class="text-center text-base-gray">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+
+{# right before your <script> #}
+{{ employee_id|json_script:"emp-id" }}
+
+<script>
+(function(){
+  const EMP_ID = JSON.parse(document.getElementById('emp-id').textContent);
+  const fmt = (v)=> Number(v||0).toLocaleString('fr-FR',{minimumFractionDigits:2, maximumFractionDigits:2});
+  const tBody = document.getElementById('tBody');
+
+  async function load(){
+
+    
+    const params = new URLSearchParams({ employee: EMP_ID, page_size: 200 });
+    const r = await fetch(`/api/v1/contracts/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+
+    // const r = await fetch(`/api/v1/contracts/?employee=${EMP_ID}&page_size=200`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const d = await r.json(); const rows = d.results || d || [];
+    if(!rows.length){ tBody.innerHTML = `<tr><td colspan="5" class="text-center text-base-gray">Aucun contrat</td></tr>`; return; }
+    tBody.innerHTML = rows.map(x=>`<tr>
+      <td>${x.contract_type}</td>
+      <td>${x.start_date||'—'}</td>
+      <td>${x.end_date||'—'}</td>
+      <td>${x.status}</td>
+      <td class="text-right">${fmt(x.salary)}</td>
+    </tr>`).join('');
+  }
+  load();
+})();
+</script>
+{% endblock %}

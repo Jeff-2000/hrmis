@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+.env
+.env.*
+*.venv
+
+# Django & SQLite
+# db.sqlite3
+db.sqlite3-journal
+*.log
+
+# Migrations (keep __init__.py but ignore generated migration files)
+*/migrations/*.py
+!*/migrations/__init__.py
+
+# Static & Media
+/staticfiles/
+/media/
+/theme/static/
+/static/
+
+# Media (user uploads)
+media/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis dump
+dump.rdb
+
+# VSCode / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Coverage / testing
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+junit.xml
+
+# Node / Tailwind (if using npm/yarn)
+node_modules/
+package-lock.json
+yarn.lock

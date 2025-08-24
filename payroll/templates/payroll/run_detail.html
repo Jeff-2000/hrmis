@@ -1,0 +1,221 @@
+{% extends 'main/base.html' %}
+{% block title %}Paie — Détail du lot{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-calendar-check"></i> Lot de Paie <span id="runPeriod" class="ml-2 text-base font-normal text-base-content/70"></span>
+        </h1>
+        <div id="runActions" class="flex gap-2"></div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+        <div class="stat bg-blue-100 rounded-box">
+          <div class="stat-title text-black">Bulletins</div>
+          <div id="kpiCount" class="stat-value text-blue-800">—</div>
+          <div class="stat-desc text-blue-700">Traitables</div>
+        </div>
+        <div class="stat bg-green-100 rounded-box">
+          <div class="stat-title text-black">Brut</div>
+          <div id="kpiGross" class="stat-value text-green-800">—</div>
+          <div class="stat-desc text-green-700">Somme brute</div>
+        </div>
+        <div class="stat bg-yellow-100 rounded-box">
+          <div class="stat-title text-black">Impôt</div>
+          <div id="kpiTax" class="stat-value text-yellow-800">—</div>
+        </div>
+        <div class="stat bg-orange-100 rounded-box">
+          <div class="stat-title text-black">Net à payer</div>
+          <div id="kpiNet" class="stat-value text-orange-800">—</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs tabs-lifted mt-6 border-b-2 border-blue-200">
+        <a class="tab tab-active bg-blue-100 text-blue-800 hover:bg-blue-200 rounded-t-lg" id="tabPayslips">Bulletins</a>
+        <a class="tab bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-t-lg" id="tabExcluded">Exclusions</a>
+      </div>
+
+      <!-- Payslips table -->
+      <div id="panePayslips" class="pt-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="label"><span class="label-text">Recherche</span></label>
+            <input id="searchEmp" class="input input-bordered input-sm w-64 bg-blue-100 text-blue-800 placeholder-blue-500 focus:bg-blue-200 focus:ring-2 focus:ring-blue-300" placeholder="Nom (contient)" />
+          </div>
+          <div class="flex-1"></div>
+          <a id="btnExportCsv" class="btn btn-sm bg-indigo-100 text-indigo-800 hover:bg-indigo-200"><i class="fas fa-file-csv mr-2"></i>Exporter CSV</a>
+        </div>
+
+        <div class="overflow-x-auto mt-3 bg-gray-100 shadow-xl">
+          <table class="table w-full">
+            <thead>
+              <tr>
+                <th class="whitespace-nowrap text-blue-600">Employé</th>
+                <th class="whitespace-nowrap text-blue-600">Brut</th>
+                <th class="whitespace-nowrap text-blue-600">Taxable</th>
+                <th class="whitespace-nowrap text-blue-600">EE</th>
+                <th class="whitespace-nowrap text-blue-600">ER</th>
+                <th class="whitespace-nowrap text-blue-600">Impôt</th>
+                <th class="whitespace-nowrap text-blue-600">Autres</th>
+                <th class="whitespace-nowrap text-blue-600">Net</th>
+                <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="slipsTbody">
+              <tr><td colspan="9" class="text-center text-base-content/60">Chargement…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-3 flex items-center gap-2">
+          <button id="prevPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Préc</button>
+          <span id="pageInfo" class="text-sm"></span>
+          <button id="nextPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Suiv</button>
+        </div>
+      </div>
+
+      <!-- Excluded pane -->
+      <div id="paneExcluded" class="hidden pt-4">
+        <div class="alert bg-yellow-50 border border-yellow-200 text-yellow-800">
+          <i class="fas fa-triangle-exclamation mr-2"></i> Employés exclus pour suspension de paie (situations actives).
+        </div>
+        <ul id="excludedList" class="menu mt-3"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const runId = {{ run_id }};
+  const state = { page:1, pageSize:10, search:'' };
+  const fmtMoney = v => (v==null?'—':new Intl.NumberFormat('fr-FR',{style:'currency',currency:'XOF'}).format(v));
+
+  function switchTab(which){
+    document.getElementById('panePayslips').classList.toggle('hidden', which!=='slips');
+    document.getElementById('paneExcluded').classList.toggle('hidden', which!=='ex');
+    document.getElementById('tabPayslips').classList.toggle('tab-active', which==='slips');
+    document.getElementById('tabExcluded').classList.toggle('tab-active', which==='ex');
+  }
+  document.getElementById('tabPayslips').addEventListener('click',()=>switchTab('slips'));
+  document.getElementById('tabExcluded').addEventListener('click',()=>switchTab('ex'));
+
+  async function loadRun(){
+    try{
+      const r = await fetch(`/api/v1/payroll/runs/${runId}/`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok) throw new Error('Lot introuvable');
+      const x = await r.json();
+      document.getElementById('runPeriod').textContent = `${String(x.month).padStart(2,'0')}/${x.year} • ${x.company_policy?.name||'—'}`;
+
+      const actions = [];
+      if (x.status!=='closed') actions.push(`<button data-act="gen" class="btn btn-sm"><i class="fas fa-rotate mr-2"></i>Recalculer</button>`);
+      if (x.status==='processed') actions.push(`<button data-act="close" class="btn btn-sm"><i class="fas fa-lock mr-2"></i>Clôturer</button>`);
+      if (x.status==='closed') actions.push(`<button data-act="reopen" class="btn btn-sm"><i class="fas fa-unlock mr-2"></i>Rouvrir</button>`);
+      actions.push(`<a class="btn btn-sm" href="/api/v1/payroll/runs/${runId}/export_csv/" target="_blank"><i class="fas fa-file-csv mr-2"></i>Exporter</a>`);
+      const bar = document.getElementById('runActions');
+      bar.innerHTML = actions.join('');
+      bar.querySelectorAll('button[data-act]').forEach(btn=>{
+        btn.addEventListener('click',()=>handleRunAction(btn.dataset.act));
+      });
+    }catch(e){ showToast(e.message, 'error'); }
+  }
+
+  async function handleRunAction(act){
+    try{
+      const r = await fetch(`/api/v1/payroll/runs/${runId}/${act==='gen'?'generate':act}/`, { method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if (!r.ok){
+        const err = await r.json().catch(()=>({detail:'Erreur'}));
+        throw new Error(err.detail || 'Action impossible');
+      }
+      showToast('Action exécutée', 'success');
+      loadRun(); loadPayslips();
+    }catch(e){ showToast(e.message, 'error'); }
+  }
+
+  async function loadPayslips(){
+    const params = new URLSearchParams();
+    params.set('page', state.page); params.set('page_size', state.pageSize);
+    params.set('run', runId);
+    if (state.search) params.set('search', state.search); // supported only if you add search; else ignored
+    const tbody = document.getElementById('slipsTbody');
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-black">Chargement…</td></tr>`;
+    try{
+      const r = await fetch(`/api/v1/payslips/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok) throw new Error('Erreur de chargement des bulletins');
+      const data = await r.json();
+      const rows = data.results || data || [];
+      if (!rows.length){ tbody.innerHTML=`<tr><td colspan="9" class="text-center text-black">Aucun bulletin</td></tr>`; }
+      else {
+        tbody.innerHTML = rows.map(p=>{
+          const full = `${p.employee?.first_name||''} ${p.employee?.last_name||''}`.trim();
+          return `<tr>
+            <td>${full||'—'}</td>
+            <td>${fmtMoney(p.gross_pay)}</td>
+            <td>${fmtMoney(p.taxable_gross)}</td>
+            <td>${fmtMoney(p.employee_contrib)}</td>
+            <td>${fmtMoney(p.employer_contrib)}</td>
+            <td>${fmtMoney(p.income_tax)}</td>
+            <td>${fmtMoney(p.other_deductions)}</td>
+            <td class="font-semibold">${fmtMoney(p.net_pay)}</td>
+            <td class="text-right">
+              <a class="btn btn-xs" href="/api/v1/payroll/payslips/${p.id}/"><i class="fas fa-eye"></i></a>
+              <a class="btn btn-xs" href="/api/v1/payslips/${p.id}/pdf/" target="_blank"><i class="fas fa-file-pdf"></i></a>
+            </td>
+          </tr>`;
+        }).join('');
+      }
+      document.getElementById('pageInfo').textContent = data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`;
+      // KPIs aggregate quickly on page (client-side)
+      const agg = rows.reduce((a,p)=>({
+        gross:a.gross+(+p.gross_pay||0),
+        tax:a.tax+(+p.income_tax||0),
+        net:a.net+(+p.net_pay||0)
+      }), {gross:0,tax:0,net:0});
+      document.getElementById('kpiCount').textContent = data.count ?? rows.length;
+      document.getElementById('kpiGross').textContent = fmtMoney(agg.gross);
+      document.getElementById('kpiTax').textContent = fmtMoney(agg.tax);
+      document.getElementById('kpiNet').textContent = fmtMoney(agg.net);
+    }catch(e){ showToast(e.message, 'error'); }
+  }
+
+  // Exclusions (simple live view: active situations with suspend_payroll)
+  async function loadExcluded(){
+    try{
+      const r = await fetch(`/api/v1/situations/situations/?active=true`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if (!r.ok) throw new Error('Erreur de chargement des situations');
+      const data = await r.json(); const rows = data.results || data || [];
+      const list = document.getElementById('excludedList');
+      const filtered = rows.filter(s => s.situation_type?.suspend_payroll);
+      if (!filtered.length){ list.innerHTML = `<li class="px-2 py-2 text-base-content/60">Aucun employé exclu</li>`; return; }
+      list.innerHTML = filtered.map(s=>{
+        const full = `${s.employee?.first_name||''} ${s.employee?.last_name||''}`.trim();
+        return `<li><div class="px-3 py-2 flex items-center justify-between">
+          <div>
+            <div class="font-semibold">${full||'—'}</div>
+            <div class="text-xs text-green-300">Type: ${s.situation_type?.name||'—'} • Début ${s.start_date}</div>
+          </div>
+          <span class="badge badge-warning">Suspend</span>
+        </div></li>`;
+      }).join('');
+    }catch(e){ showToast(e.message, 'error'); }
+  }
+
+  // search + paging
+  document.getElementById('searchEmp').addEventListener('input', ()=>{
+    clearTimeout(window._t); window._t=setTimeout(()=>{ state.page=1; loadPayslips(); }, 300);
+  });
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){state.page--; loadPayslips();}});
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadPayslips(); });
+
+  // init
+  loadRun(); loadPayslips(); loadExcluded();
+})();
+</script>
+{% endblock %}

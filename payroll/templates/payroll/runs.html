@@ -1,0 +1,557 @@
+{% extends 'main/base.html' %}
+{% block title %}Paie — Lots mensuels{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-money-check"></i> Lots de Paie
+        </h1>
+        <button id="btnNewRun" class="btn bg-orange-600 hover:bg-orange-700 text-white">
+          <i class="fas fa-plus mr-2"></i> Nouveau lot
+        </button>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4">
+        <div>
+          <label class="label"><span class="label-text">Politique</span></label>
+          <select id="policySelect" class="select select-bordered w-full bg-blue-100 text-blue-800 hover:bg-blue-300">
+            <option value="">Chargement...</option>
+          </select>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Année</span></label>
+          <select id="yearSelect" class="select select-bordered w-full bg-blue-100 text-blue-800 hover:bg-blue-300"></select>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Mois</span></label>
+          <select id="monthSelect" class="select select-bordered w-full bg-blue-100 text-blue-800 hover:bg-blue-300"></select>
+        </div>
+        <div class="md:col-span-2">
+          <label class="label"><span class="label-text">Statut</span></label>
+          <div class="flex gap-2">
+            <button data-status="" class="chip-status btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Tous</button>
+            <button data-status="draft" class="chip-status btn btn-sm bg-yellow-100 text-yellow-800 hover:bg-yellow-200">Brouillon</button>
+            <button data-status="processed" class="chip-status btn btn-sm bg-green-100 text-green-800 hover:bg-green-200">Traité</button>
+            <button data-status="closed" class="chip-status btn btn-sm bg-gray-100 text-gray-800 hover:bg-gray-200">Clôturé</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-x-auto mt-4 bg-gray-100 shadow-xl">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap text-blue-600">Période</th>
+              <th class="whitespace-nowrap text-blue-600">Politique</th>
+              <th class="whitespace-nowrap text-blue-600">Statut</th>
+              <th class="whitespace-nowrap text-blue-600">Généré</th>
+              <th class="whitespace-nowrap text-blue-600">Traité</th>
+              <th class="whitespace-nowrap text-blue-600">Clôturé</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="runsTbody">
+            <tr><td colspan="7" class="text-center text-base-content/60">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="mt-3 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Run Modal -->
+<input type="checkbox" id="createRunModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg mb-2">Nouveau lot de paie</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div>
+        <label class="label"><span class="label-text">Politique</span></label>
+        <select id="modalPolicy" class="select select-bordered w-full bg-blue-50"></select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Année</span></label>
+        <select id="modalYear" class="select select-bordered w-full bg-blue-50"></select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Mois</span></label>
+        <select id="modalMonth" class="select select-bordered w-full bg-blue-50"></select>
+      </div>
+    </div>
+    <div class="modal-action">
+      <label for="createRunModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnCreateRun" class="btn bg-orange-600 hover:bg-orange-700 text-white">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Action Modal -->
+<input type="checkbox" id="confirmModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600 max-w-md">
+    <div class="flex items-start gap-3">
+      <div id="confIcon" class="w-10 h-10 rounded-full flex items-center justify-center bg-yellow-100 text-yellow-700">
+        <i class="fas fa-triangle-exclamation"></i>
+      </div>
+      <div class="flex-1">
+        <h3 id="confTitle" class="font-bold text-lg mb-1">Confirmer l’action</h3>
+        <p id="confBody" class="text-sm text-gray-600">
+          Êtes-vous sûr(e) de vouloir continuer ?
+        </p>
+      </div>
+    </div>
+    <div id="confWarn" class="mt-3 text-xs text-red-600 hidden">
+      Cette opération est potentiellement irréversible.
+    </div>
+    <div class="modal-action">
+      <label for="confirmModal" class="btn btn-ghost">Annuler</label>
+      <button id="confirmYes" class="btn bg-orange-600 hover:bg-orange-700 text-white">
+        Confirmer
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% comment %} <script>
+(function(){
+  const qs = new URLSearchParams(location.search);
+  const state = { page: 1, pageSize: 10, status: "" };
+
+  const yearSel   = document.getElementById('yearSelect');
+  const monthSel  = document.getElementById('monthSelect');
+  const policySel = document.getElementById('policySelect');
+
+  const modalYear   = document.getElementById('modalYear');
+  const modalMonth  = document.getElementById('modalMonth');
+  const modalPolicy = document.getElementById('modalPolicy');
+
+  function range(a,b){ const out=[]; for(let i=a;i<=b;i++) out.push(i); return out; }
+  function now(){ const d=new Date(); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
+
+  function fillYear(select){
+    const {y} = now();
+    select.innerHTML = range(y-2, y+2).map(v=>`<option value="${v}" ${v===y?'selected':''}>${v}</option>`).join('');
+  }
+  function fillMonth(select){
+    const {m} = now();
+    select.innerHTML = range(1,12).map(v=>`<option value="${v}" ${v===m?'selected':''}>${v.toString().padStart(2,'0')}</option>`).join('');
+  }
+
+  fillYear(yearSel); fillMonth(monthSel);
+  fillYear(modalYear); fillMonth(modalMonth);
+
+  async function loadPolicies() {
+    try{
+      const r = await fetch('/api/v1/company-policy/', { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok) throw new Error('Impossible de charger les politiques de paie');
+      const data = await r.json();
+      const rows = (data.results || data || []);
+      policySel.innerHTML = `<option value="">Toutes</option>` + rows.map(p=>`<option value="${p.id}">${p.name} (${p.currency?.code||''})</option>`).join('');
+      modalPolicy.innerHTML = rows.map(p=>`<option value="${p.id}">${p.name} (${p.currency?.code||''})</option>`).join('');
+    }catch(e){
+      policySel.innerHTML = `<option value="">(aucune)</option>`;
+      modalPolicy.innerHTML = `<option value="">(aucune)</option>`;
+      showToast(e.message || 'Erreur de chargement des politiques');
+    }
+  }
+  loadPolicies();
+
+  async function loadRuns(){
+    const params = new URLSearchParams();
+    params.set('page', state.page);
+    params.set('page_size', state.pageSize);
+
+    // filters
+    if (policySel.value) params.set('company_policy', policySel.value);
+    if (yearSel.value)   params.set('year', yearSel.value);
+    if (monthSel.value)  params.set('month', monthSel.value);
+    if (state.status)    params.set('status', state.status);
+
+    const tbody = document.getElementById('runsTbody');
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-base-content/60">Chargement…</td></tr>`;
+
+    try{
+      const r = await fetch(`/api/v1/runs/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok) throw new Error('Erreur lors du chargement des lots');
+      const data = await r.json();
+      const rows = data.results || data || [];
+      if (!rows.length){
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-base-content/60">Aucun lot</td></tr>`;
+      } else {
+        tbody.innerHTML = rows.map(x=>{
+          const badge = x.status==='draft' ? 'badge-warning' : (x.status==='processed'?'badge-info':'badge-success');
+          return `<tr>
+            <td>${String(x.month).padStart(2,'0')}/${x.year}</td>
+            <td>${x.company_policy?.name || '—'}</td>
+            <td><span class="badge ${badge}">${x.status.toUpperCase()}</span></td>
+            <td>${x.generated_at?x.generated_at.replace('T',' ').slice(0,16):'—'}</td>
+            <td>${x.processed_at?x.processed_at.replace('T',' ').slice(0,16):'—'}</td>
+            <td>${x.closed_at?x.closed_at.replace('T',' ').slice(0,16):'—'}</td>
+            <td class="text-right">
+              <a href="/api/v1/payroll/runs/${x.id}/" class="btn btn-xs bg-blue-100 text-blue-800 hover:bg-blue-200">Voir</a>
+              ${x.status!=='closed' ? `<button class="btn btn-xs bg-green-100 text-green-800 hover:bg-green-200" data-act="gen" data-id="${x.id}"><i class="fas fa-rotate"></i></button>`:''}
+              ${x.status==='processed' ? `<button class="btn btn-xs bg-yellow-100 text-yellow-800 hover:bg-yellow-200" data-act="close" data-id="${x.id}"><i class="fas fa-lock"></i></button>`:''}
+              ${x.status==='closed' ? `<button class="btn btn-xs bg-gray-100 text-gray-800 hover:bg-gray-200" data-act="reopen" data-id="${x.id}"><i class="fas fa-unlock"></i></button>`:''}
+              <a class="btn btn-xs bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
+                href="/api/v1/runs/${x.id}/export_csv/">
+                <i class="fas fa-file-csv"></i>
+              </a>
+
+            </td>
+          </tr>`;
+        }).join('');
+      }
+      document.getElementById('pageInfo').textContent = data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`;
+      // actions
+      tbody.querySelectorAll('button[data-act]').forEach(btn=>{
+        btn.addEventListener('click', ()=>handleRunAction(btn.dataset.act, btn.dataset.id));
+      });
+    }catch(e){ showToast(e.message || 'Erreur', 'error'); }
+  }
+
+  async function handleRunAction(act, id){
+    const url = `/api/v1/runs/${id}/${act==='gen'?'generate':act}/`;
+    const r = await csrfFetch(url, { method:'POST' });
+    try{
+      const r = await fetch(url, { method: 'POST', headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok){
+        const err = await r.json().catch(()=>({detail:'Erreur'}));
+        throw new Error(err.detail || 'Action impossible');
+      }
+      showToast('Action exécutée', 'success');
+      loadRuns();
+    }catch(e){ showToast(e.message, 'error'); }
+  }
+
+  // Filters wiring
+  yearSel.addEventListener('change', loadRuns);
+  monthSel.addEventListener('change', loadRuns);
+  policySel.addEventListener('change', loadRuns);
+  document.querySelectorAll('.chip-status').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('.chip-status').forEach(bb=>bb.classList.remove('btn-active'));
+      b.classList.add('btn-active');
+      state.status = b.dataset.status || '';
+      loadRuns();
+    });
+  });
+
+  // pagination
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){state.page--; loadRuns(); } });
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadRuns(); });
+
+  // New run modal
+  document.getElementById('btnNewRun').addEventListener('click', ()=>{
+    document.getElementById('createRunModal').checked = true;
+    // sync current filters into modal
+    modalYear.innerHTML  = yearSel.innerHTML;  modalYear.value  = yearSel.value;
+    modalMonth.innerHTML = monthSel.innerHTML; modalMonth.value = monthSel.value;
+    modalPolicy.innerHTML= policySel.innerHTML;
+  });
+
+  document.getElementById('btnCreateRun').addEventListener('click', async ()=>{
+    const payload = {
+      company_policy_id: modalPolicy.value || null,
+      year: parseInt(modalYear.value||0), month: parseInt(modalMonth.value||0)
+    };
+    if (!payload.company_policy_id){ showToast('Veuillez choisir une politique', 'error'); return; }
+    try{
+      const r = await csrfFetch('/api/v1/runs/', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok){
+        const err = await r.json().catch(()=>({detail:'Erreur'}));
+        throw new Error(err.detail || 'Création impossible');
+      }
+      document.getElementById('createRunModal').checked = false;
+      showToast('Lot créé.', 'success'); loadRuns();
+    }catch(e){ showToast(e.message, 'error'); }
+  });
+
+  // initial
+  loadRuns();
+})();
+</script> {% endcomment %}
+
+<script>
+(function(){
+  const qs = new URLSearchParams(location.search);
+  const state = { page: 1, pageSize: 10, status: "" };
+
+  const yearSel   = document.getElementById('yearSelect');
+  const monthSel  = document.getElementById('monthSelect');
+  const policySel = document.getElementById('policySelect');
+
+  const modalYear   = document.getElementById('modalYear');
+  const modalMonth  = document.getElementById('modalMonth');
+  const modalPolicy = document.getElementById('modalPolicy');
+
+  // ---------- CSRF helper (prevents 403) ----------
+  function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+  }
+  async function csrfFetch(url, opts={}){
+    const headers = Object.assign({
+      'X-Requested-With':'XMLHttpRequest',
+      'X-CSRFToken': getCookie('csrftoken'),
+    }, opts.headers || {});
+    return fetch(url, Object.assign({}, opts, { headers }));
+  }
+
+  // ---------- Confirm modal helper ----------
+  const confirmModal = document.getElementById('confirmModal');
+  const confTitle = document.getElementById('confTitle');
+  const confBody  = document.getElementById('confBody');
+  const confWarn  = document.getElementById('confWarn');
+  const confIcon  = document.getElementById('confIcon');
+  // const confYes   = document.getElementById('confirmYes');
+  let confYes = document.getElementById('confirmYes');
+
+  function openConfirm({title, body, showWarn=false, style='orange', confirmText='Confirmer', onConfirm}){
+    confTitle.textContent = title || 'Confirmer l’action';
+    confBody.textContent  = body  || 'Êtes-vous sûr(e) de vouloir continuer ?';
+    confWarn.classList.toggle('hidden', !showWarn);
+
+    // icon/background color
+    const styles = {
+      green:  ['bg-green-100','text-green-700'],
+      yellow: ['bg-yellow-100','text-yellow-700'],
+      gray:   ['bg-gray-100','text-gray-700'],
+      orange: ['bg-orange-100','text-orange-700'],
+      red:    ['bg-red-100','text-red-700'],
+    };
+    confIcon.className = 'w-10 h-10 rounded-full flex items-center justify-center ' + (styles[style] || styles.orange).join(' ');
+    confIcon.innerHTML = `<i class="fas fa-triangle-exclamation"></i>`;
+
+    // confirm button styling
+    confYes.className = 'btn text-white ' + ({
+      green:  'bg-green-600 hover:bg-green-700',
+      yellow: 'bg-yellow-600 hover:bg-yellow-700',
+      gray:   'bg-gray-700 hover:bg-gray-800',
+      orange: 'bg-orange-600 hover:bg-orange-700',
+      red:    'bg-red-600 hover:bg-red-700',
+    }[style] || 'bg-orange-600 hover:bg-orange-700');
+
+    confYes.textContent = confirmText || 'Confirmer';
+
+    // ensure single-use listener
+    const newBtn = confYes.cloneNode(true);
+    confYes.parentNode.replaceChild(newBtn, confYes);
+    confYes = newBtn; // update reference
+
+    newBtn.addEventListener('click', async ()=>{
+      // document.getElementById('confirmModal').checked = false;
+      confirmModal.checked = false;
+      try { await onConfirm?.(); } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+    });
+
+    confirmModal.checked = true;
+  }
+
+  function range(a,b){ const out=[]; for(let i=a;i<=b;i++) out.push(i); return out; }
+  function now(){ const d=new Date(); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
+
+  function fillYear(select){
+    const {y} = now();
+    select.innerHTML = range(y-2, y+2).map(v=>`<option value="${v}" ${v===y?'selected':''}>${v}</option>`).join('');
+  }
+  function fillMonth(select){
+    const {m} = now();
+    select.innerHTML = range(1,12).map(v=>`<option value="${v}" ${v===m?'selected':''}>${v.toString().padStart(2,'0')}</option>`).join('');
+  }
+
+  fillYear(yearSel); fillMonth(monthSel);
+  fillYear(modalYear); fillMonth(modalMonth);
+
+  async function loadPolicies() {
+    try{
+      const r = await fetch('/api/v1/company-policy/', { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok) throw new Error('Impossible de charger les politiques de paie');
+      const data = await r.json();
+      const rows = (data.results || data || []);
+      policySel.innerHTML = `<option value="">Toutes</option>` + rows.map(p=>`<option value="${p.id}">${p.name} (${p.currency?.code||''})</option>`).join('');
+      modalPolicy.innerHTML = rows.map(p=>`<option value="${p.id}">${p.name} (${p.currency?.code||''})</option>`).join('');
+    }catch(e){
+      policySel.innerHTML = `<option value="">(aucune)</option>`;
+      modalPolicy.innerHTML = `<option value="">(aucune)</option>`;
+      showToast(e.message || 'Erreur de chargement des politiques');
+    }
+  }
+  loadPolicies();
+
+  async function loadRuns(){
+    const params = new URLSearchParams();
+    params.set('page', state.page);
+    params.set('page_size', state.pageSize);
+
+    if (policySel.value) params.set('company_policy', policySel.value);
+    if (yearSel.value)   params.set('year', yearSel.value);
+    if (monthSel.value)  params.set('month', monthSel.value);
+    if (state.status)    params.set('status', state.status);
+
+    const tbody = document.getElementById('runsTbody');
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-base-content/60">Chargement…</td></tr>`;
+
+    try{
+      const r = await fetch(`/api/v1/runs/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok) throw new Error('Erreur lors du chargement des lots');
+      const data = await r.json();
+      const rows = data.results || data || [];
+      if (!rows.length){
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-base-content/60">Aucun lot</td></tr>`;
+      } else {
+        tbody.innerHTML = rows.map(x=>{
+          const badge = x.status==='draft' ? 'badge-warning' : (x.status==='processed'?'badge-info':'badge-success');
+          const period = `${String(x.month).padStart(2,'0')}/${x.year}`;
+          return `<tr>
+            <td>${period}</td>
+            <td>${x.company_policy?.name || '—'}</td>
+            <td><span class="badge ${badge}">${x.status.toUpperCase()}</span></td>
+            <td>${x.generated_at?x.generated_at.replace('T',' ').slice(0,16):'—'}</td>
+            <td>${x.processed_at?x.processed_at.replace('T',' ').slice(0,16):'—'}</td>
+            <td>${x.closed_at?x.closed_at.replace('T',' ').slice(0,16):'—'}</td>
+            <td class="text-right">
+              <a href="/api/v1/payroll/runs/${x.id}/" class="btn btn-xs bg-blue-100 text-blue-800 hover:bg-blue-200">Voir</a>
+              ${x.status!=='closed' ? `<button class="btn btn-xs bg-green-100 text-green-800 hover:bg-green-200" data-act="gen" data-id="${x.id}" data-period="${period}">
+                <i class="fas fa-rotate"></i>
+              </button>`:''}
+              ${x.status==='processed' ? `<button class="btn btn-xs bg-yellow-100 text-yellow-800 hover:bg-yellow-200" data-act="close" data-id="${x.id}" data-period="${period}">
+                <i class="fas fa-lock"></i>
+              </button>`:''}
+              ${x.status==='closed' ? `<button class="btn btn-xs bg-gray-100 text-gray-800 hover:bg-gray-200" data-act="reopen" data-id="${x.id}" data-period="${period}">
+                <i class="fas fa-unlock"></i>
+              </button>`:''}
+              <a class="btn btn-xs bg-indigo-100 text-indigo-800 hover:bg-indigo-200" href="/api/v1/runs/${x.id}/export_csv/">
+                <i class="fas fa-file-csv"></i>
+              </a>
+            </td>
+          </tr>`;
+        }).join('');
+      }
+      document.getElementById('pageInfo').textContent = data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`;
+
+      // actions
+      tbody.querySelectorAll('button[data-act]').forEach(btn=>{
+        btn.addEventListener('click', ()=>confirmRunAction(btn.dataset.act, btn.dataset.id, btn.dataset.period));
+      });
+    }catch(e){ showToast(e.message || 'Erreur', 'error'); }
+  }
+
+  function confirmRunAction(act, id, period){
+    const map = {
+      gen: {
+        title: `Générer le lot ${period} ?`,
+        body:  `Cette opération calcule/actualise tous les bulletins du lot ${period}. Les bulletins existants seront écrasés.`,
+        style: 'green',
+        confirmText: 'Générer'
+      },
+      close: {
+        title: `Clôturer le lot ${period} ?`,
+        body:  `Après clôture, aucune modification ne sera possible sur ce lot. Confirmez la validation du paiement.`,
+        style: 'yellow',
+        confirmText: 'Clôturer',
+        warn: true
+      },
+      reopen: {
+        title: `Réouvrir le lot ${period} ?`,
+        body:  `Le lot sera remis en état "Traité". Vous pourrez à nouveau recalculer et modifier les bulletins.`,
+        style: 'gray',
+        confirmText: 'Réouvrir'
+      }
+    };
+    const cfg = map[act] || { title:'Confirmer', body:'Continuer ?', style:'orange', confirmText:'Confirmer' };
+    openConfirm({
+      title: cfg.title,
+      body: cfg.body,
+      showWarn: !!cfg.warn,
+      style: cfg.style,
+      confirmText: cfg.confirmText,
+      onConfirm: async () => {
+        await handleRunAction(act, id);
+      }
+    });
+  }
+
+  async function handleRunAction(act, id){
+    const url = `/api/v1/runs/${id}/${act==='gen'?'generate':act}/`;
+    try{
+      const r = await csrfFetch(url, { method: 'POST' });
+      if(!r.ok){
+        const err = await r.json().catch(()=>({detail:'Erreur'}));
+        throw new Error(err.detail || 'Action impossible');
+      }
+      showToast('Action exécutée', 'success');
+      loadRuns();
+    }catch(e){ showToast(e.message, 'error'); }
+  }
+
+  // Filters wiring
+  yearSel.addEventListener('change', loadRuns);
+  monthSel.addEventListener('change', loadRuns);
+  policySel.addEventListener('change', loadRuns);
+  document.querySelectorAll('.chip-status').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('.chip-status').forEach(bb=>bb.classList.remove('btn-active'));
+      b.classList.add('btn-active');
+      state.status = b.dataset.status || '';
+      loadRuns();
+    });
+  });
+
+  // pagination
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){state.page--; loadRuns(); } });
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadRuns(); });
+
+  // New run modal
+  document.getElementById('btnNewRun').addEventListener('click', ()=>{
+    document.getElementById('createRunModal').checked = true;
+    modalYear.innerHTML  = yearSel.innerHTML;  modalYear.value  = yearSel.value;
+    modalMonth.innerHTML = monthSel.innerHTML; modalMonth.value = monthSel.value;
+    modalPolicy.innerHTML= policySel.innerHTML;
+  });
+
+  document.getElementById('btnCreateRun').addEventListener('click', async ()=>{
+    const payload = {
+      company_policy_id: modalPolicy.value || null,
+      year: parseInt(modalYear.value||0),
+      month: parseInt(modalMonth.value||0)
+    };
+    if (!payload.company_policy_id){ showToast('Veuillez choisir une politique', 'error'); return; }
+    try{
+      const r = await csrfFetch('/api/v1/runs/', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok){
+        const err = await r.json().catch(()=>({detail:'Erreur'}));
+        throw new Error(err.detail || 'Création impossible');
+      }
+      document.getElementById('createRunModal').checked = false;
+      showToast('Lot créé.', 'success'); loadRuns();
+    }catch(e){ showToast(e.message, 'error'); }
+  });
+
+  // initial
+  loadRuns();
+})();
+</script>
+{% endblock %}

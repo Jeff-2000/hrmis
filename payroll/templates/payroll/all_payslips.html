@@ -1,0 +1,371 @@
+{% extends 'main/base.html' %}
+{% block title %}Paie — Tous les bulletins{% endblock %}
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-file-invoice-dollar"></i> Tous les bulletins
+        </h1>
+        <div class="flex gap-2">
+          <button id="btnNewContract" class="btn bg-green-600 hover:bg-green-700 text-white">
+            <i class="fas fa-file-signature mr-2"></i> Nouveau contrat
+          </button>
+          <button id="btnNewRecurring" class="btn bg-indigo-600 hover:bg-indigo-700 text-white">
+            <i class="fas fa-repeat mr-2"></i> Nouvel élément récurrent
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtres -->
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4">
+        <div class="md:col-span-2">
+          <label class="label"><span class="label-text">Employé</span></label>
+          <div class="relative">
+            <input id="empSearch" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="Rechercher (nom, matricule)…">
+            <div id="empResults" class="absolute z-50 mt-1 w-full bg-white shadow rounded hidden max-h-64 overflow-auto"></div>
+          </div>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Année</span></label>
+          <select id="yearSelect" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Mois</span></label>
+          <select id="monthSelect" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button id="btnExport" class="btn w-full bg-blue-100 text-blue-800 hover:bg-blue-200">
+            <i class="fas fa-file-csv mr-2"></i> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Tableau -->
+      <div class="overflow-x-auto mt-4 bg-gray-50 rounded">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap text-blue-600">Période</th>
+              <th class="whitespace-nowrap text-blue-600">Employé</th>
+              <th class="whitespace-nowrap text-blue-600">Département</th>
+              <th class="whitespace-nowrap text-blue-600">Grade</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Net</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbodySlips">
+            <tr><td colspan="6" class="text-center text-base-gray">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pager -->
+      <div class="mt-3 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL Contrat -->
+<input type="checkbox" id="contractModal" class="modal-toggle" />
+<div class="modal"><div class="modal-box bg-white border-l-4 border-orange-600">
+  <h3 class="font-bold text-lg mb-2">Nouveau contrat</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="md:col-span-2">
+      <label class="label"><span class="label-text">Employé</span></label>
+      <div class="relative">
+        <input id="c_emp_search" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="Rechercher employé…">
+        <div id="c_emp_results" class="absolute z-50 mt-1 w-full bg-white shadow rounded hidden max-h-64 overflow-auto"></div>
+      </div>
+      <input id="c_emp_id" type="hidden">
+    </div>
+    <div>
+      <label class="label"><span class="label-text">Type</span></label>
+      <select id="c_type" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+        <option value="PERMANENT">Permanent</option>
+        <option value="CONTRACTUAL">Contractuel</option>
+        <option value="TEMPORARY">Temporaire</option>
+      </select>
+    </div>
+    <div>
+      <label class="label"><span class="label-text">Salaire</span></label>
+      <input id="c_salary" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div><label class="label"><span class="label-text">Début</span></label>
+      <input id="c_start" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div><label class="label"><span class="label-text">Fin</span></label>
+      <input id="c_end" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div class="md:col-span-2"><label class="label"><span class="label-text">Statut</span></label>
+      <select id="c_status" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+        <option value="ACTIVE">Actif</option>
+        <option value="EXPIRED">Expiré</option>
+        <option value="TERMINATED">Terminé</option>
+      </select>
+    </div>
+    <div class="md:col-span-2"><label class="label"><span class="label-text">Notes</span></label>
+      <textarea id="c_notes" class="textarea textarea-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></textarea>
+    </div>
+  </div>
+  <div class="modal-action">
+    <label for="contractModal" class="btn btn-ghost">Annuler</label>
+    <button id="c_save" class="btn bg-orange-600 text-white">Enregistrer</button>
+  </div>
+</div></div>
+
+<!-- MODAL Récurrent -->
+<input type="checkbox" id="recModal" class="modal-toggle" />
+<div class="modal"><div class="modal-box bg-white border-l-4 border-orange-600">
+  <h3 class="font-bold text-lg mb-2">Nouvel élément récurrent</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="md:col-span-2">
+      <label class="label"><span class="label-text">Employé</span></label>
+      <div class="relative">
+        <input id="r_emp_search" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="Rechercher employé…">
+        <div id="r_emp_results" class="absolute z-50 mt-1 w-full bg-white shadow rounded hidden max-h-64 overflow-auto"></div>
+      </div>
+      <input id="r_emp_id" type="hidden">
+    </div>
+    <div class="md:col-span-2">
+      <label class="label"><span class="label-text">Composant</span></label>
+      <select id="r_comp" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+    </div>
+    <div><label class="label"><span class="label-text">Montant</span></label>
+      <input id="r_amount" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" value="0">
+    </div>
+    <div><label class="label"><span class="label-text">Pourcentage</span></label>
+      <input id="r_pct" type="number" step="0.0001" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div><label class="label"><span class="label-text">Début</span></label>
+      <input id="r_start" type="date" class="input input-bordered w-full">
+    </div>
+    <div><label class="label"><span class="label-text">Fin</span></label>
+      <input id="r_end" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div class="md:col-span-2"><label class="label"><span class="label-text">Note</span></label>
+      <input id="r_note" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+  </div>
+  <div class="modal-action">
+    <label for="recModal" class="btn btn-ghost">Annuler</label>
+    <button id="r_save" class="btn bg-orange-600 text-white">Enregistrer</button>
+  </div>
+</div></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // ------- helpers
+  function range(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i);return r;}
+  function now(){ const d=new Date(); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
+  function fmtMoney(v){ return v==null?'—':new Intl.NumberFormat('fr-FR',{style:'currency',currency:'XOF'}).format(v); }
+  function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)'); return m?m.pop():'';
+  }
+  const CSRF = getCookie('csrftoken');
+
+  // ------- DOM
+  const yearSel = document.getElementById('yearSelect');
+  const monthSel= document.getElementById('monthSelect');
+  const tbody   = document.getElementById('tbodySlips');
+  const {y} = now(); yearSel.innerHTML = range(y-2,y+2).map(v=>`<option value="${v}" ${v===y?'selected':''}>${v}</option>`).join('');
+  monthSel.innerHTML += range(1,12).map(v=>`<option value="${v}">${String(v).padStart(2,'0')}</option>`).join('');
+
+  let state = { page:1, pageSize:15, employee:null };
+
+  // ------- employee search (filters)
+  const empSearch = document.getElementById('empSearch');
+  const empResults= document.getElementById('empResults');
+  let empTimer=null;
+
+  async function searchEmployees(q){
+    const r = await fetch(`/api/v1/employees/?page_size=10&search=${encodeURIComponent(q)}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const d = await r.json(); return d.results || d || [];
+  }
+  function showEmpResults(rows, target='filter'){
+    const box = empResults;
+    if(!rows.length){ box.classList.add('hidden'); box.innerHTML=''; return; }
+    box.classList.remove('hidden');
+    box.innerHTML = rows.map(u=>`<div class="px-3 py-2 hover:bg-orange-50 cursor-pointer" data-id="${u.id}">
+      ${u.first_name||''} ${u.last_name||''} <span class="text-xs text-gray-500">${u.matricule||''}</span>
+    </div>`).join('');
+    box.querySelectorAll('[data-id]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        state.employee = el.dataset.id;
+        empSearch.value = el.textContent.trim();
+        box.classList.add('hidden'); loadSlips();
+      });
+    });
+  }
+  empSearch.addEventListener('input', ()=>{
+    clearTimeout(empTimer);
+    const q = empSearch.value.trim();
+    if(!q){ state.employee=null; loadSlips(); empResults.classList.add('hidden'); return; }
+    empTimer = setTimeout(async ()=>{ showEmpResults(await searchEmployees(q)); }, 250);
+  });
+
+  // ------- load components for recurring modal
+  async function loadComponents(){
+    const r = await fetch('/api/v1/components/?page_size=200', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const d = await r.json(); const rows = d.results || d || [];
+    document.getElementById('r_comp').innerHTML = rows.map(c=>`<option value="${c.id}">${c.code} — ${c.name}</option>`).join('');
+  }
+  loadComponents();
+
+  // ------- list payslips
+  async function loadSlips(){
+    const params = new URLSearchParams();
+    params.set('page', state.page); params.set('page_size', state.pageSize);
+    if (yearSel.value)  params.set('year', yearSel.value);
+    if (monthSel.value) params.set('month', monthSel.value);
+    if (state.employee) params.set('employee', state.employee); // HR/ADMIN-only filter
+
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-base-content/60">Chargement…</td></tr>`;
+    const r = await fetch(`/api/v1/payslips/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+    const data = await r.json(); const rows = data.results || data || [];
+    if (!rows.length){ tbody.innerHTML = `<tr><td colspan="6" class="text-center text-base-content/60">Aucun bulletin</td></tr>`; return; }
+    tbody.innerHTML = rows.map(p=>{
+      const emp = p.employee || {};
+      const dept = emp.department?.name || '—';
+      const grade= emp.grade?.code || '—';
+      return `<tr>
+        <td>${String(p.run?.month||'').padStart(2,'0')}/${p.run?.year||''}</td>
+        <td>${(emp.first_name||'')+' '+(emp.last_name||'')}</td>
+        <td>${dept}</td>
+        <td>${grade}</td>
+        <td class="text-right">${fmtMoney(p.net_pay)}</td>
+        <td class="text-right">
+          <a class="btn btn-xs bg-blue-100 text-blue-800 hover:bg-blue-200" href="/api/v1/payroll/payslips/${p.id}/">Voir</a>
+          <a class="btn btn-xs bg-orange-100 text-orange-800 hover:bg-orange-200" href="/api/v1/payslips/${p.id}/pdf/" target="_blank"><i class="fas fa-file-pdf"></i></a>
+        </td>
+      </tr>`;
+    }).join('');
+    document.getElementById('pageInfo').textContent = data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`;
+  }
+
+  // ------- pager & filters
+  yearSel.addEventListener('change', ()=>{ state.page=1; loadSlips(); });
+  monthSel.addEventListener('change', ()=>{ state.page=1; loadSlips(); });
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){state.page--; loadSlips();}});
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadSlips(); });
+
+  // ------- export CSV (respecte filtres, y compris employee)
+  document.getElementById('btnExport').addEventListener('click', async ()=>{
+    const params = new URLSearchParams();
+    if (yearSel.value)  params.set('year', yearSel.value);
+    if (monthSel.value) params.set('month', monthSel.value);
+    if (state.employee) params.set('employee', state.employee);
+    params.set('page_size', 9999);
+
+    const r = await fetch(`/api/v1/payslips/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+    const data = await r.json(); const rows = data.results || data || [];
+    const csv = [
+      ['Période','Employé','Département','Grade','Brut','Taxable','EE','ER','Impôt','Autres','Net','Devise'].join(',')
+    ].concat(rows.map(p=>{
+      const emp = p.employee||{};
+      return [
+        `${String(p.run?.month||'').padStart(2,'0')}/${p.run?.year||''}`,
+        `${emp.first_name||''} ${emp.last_name||''}`.trim(),
+        emp.department?.name||'',
+        emp.grade?.code||'',
+        p.gross_pay||0, p.taxable_gross||0, p.employee_contrib||0, p.employer_contrib||0, p.income_tax||0, p.other_deductions||0, p.net_pay||0,
+        p.currency?.code||''
+      ].join(',');
+    })).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href=url; a.download=`payslips_export.csv`; a.click(); URL.revokeObjectURL(url);
+  });
+
+  // ------- open modals
+  document.getElementById('btnNewContract').addEventListener('click', ()=>{ document.getElementById('contractModal').checked = true; });
+  document.getElementById('btnNewRecurring').addEventListener('click', ()=>{ document.getElementById('recModal').checked = true; });
+
+  // ------- employee pickers inside modals
+  function wireModalEmpPicker(inputId, resultsId, hiddenId){
+    const inp = document.getElementById(inputId);
+    const box = document.getElementById(resultsId);
+    const hid = document.getElementById(hiddenId);
+    let t=null;
+    inp.addEventListener('input', ()=>{
+      clearTimeout(t);
+      const q=inp.value.trim(); if(!q){ box.classList.add('hidden'); hid.value=''; return; }
+      t=setTimeout(async ()=>{
+        const r = await fetch(`/api/v1/employees/?page_size=10&search=${encodeURIComponent(q)}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+        const d = await r.json(); const rows = d.results || d || [];
+        if(!rows.length){ box.classList.add('hidden'); box.innerHTML=''; return; }
+        box.classList.remove('hidden');
+        box.innerHTML = rows.map(u=>`<div class="px-3 py-2 hover:bg-orange-50 cursor-pointer" data-id="${u.id}">
+          ${u.first_name||''} ${u.last_name||''} <span class="text-xs text-gray-500">${u.matricule||''}</span>
+        </div>`).join('');
+        box.querySelectorAll('[data-id]').forEach(el=>{
+          el.addEventListener('click', ()=>{
+            hid.value = el.dataset.id;
+            inp.value = el.textContent.trim();
+            box.classList.add('hidden');
+          });
+        });
+      }, 250);
+    });
+  }
+  wireModalEmpPicker('c_emp_search','c_emp_results','c_emp_id');
+  wireModalEmpPicker('r_emp_search','r_emp_results','r_emp_id');
+
+  // ------- save contract (ADMIN/HR only -> API autorisée)
+  document.getElementById('c_save').addEventListener('click', async ()=>{
+    const payload = {
+      employee_id: document.getElementById('c_emp_id').value || null,
+      contract_type: document.getElementById('c_type').value,
+      salary: document.getElementById('c_salary').value,
+      start_date: document.getElementById('c_start').value,
+      end_date: document.getElementById('c_end').value || null,
+      status: document.getElementById('c_status').value,
+      notes: document.getElementById('c_notes').value
+    };
+    if (!payload.employee_id){ showToast('Sélectionnez un employé', 'error'); return; }
+    const r = await fetch('/api/v1/contracts/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok){ const err=await r.json().catch(()=>({detail:'Erreur'})); showToast(err.detail||'Création impossible','error'); return; }
+    document.getElementById('contractModal').checked=false; showToast('Contrat créé','success'); loadSlips();
+  });
+
+  // ------- save recurring
+  document.getElementById('r_save').addEventListener('click', async ()=>{
+    const payload = {
+      employee_id: document.getElementById('r_emp_id').value || null,
+      component_id: document.getElementById('r_comp').value,
+      amount: document.getElementById('r_amount').value,
+      percentage: document.getElementById('r_pct').value || null,
+      start_date: document.getElementById('r_start').value,
+      end_date: document.getElementById('r_end').value || null,
+      note: document.getElementById('r_note').value,
+      active: true
+    };
+    if (!payload.employee_id){ showToast('Sélectionnez un employé', 'error'); return; }
+    const r = await fetch('/api/v1/recurring/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok){ const err=await r.json().catch(()=>({detail:'Erreur'})); showToast(err.detail||'Création impossible','error'); return; }
+    document.getElementById('recModal').checked=false; showToast('Élément récurrent créé','success'); loadSlips();
+  });
+
+  // init
+  loadSlips();
+})();
+</script>
+{% endblock %}

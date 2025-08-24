@@ -1,0 +1,110 @@
+
+
+{# templates/a_account/settings.html #}
+{% extends 'main/base.html' %}
+{% block content %}
+<div class="container mx-auto px-4 py-6 space-y-6">
+  <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2">
+    <i class="fas fa-cog"></i> Paramètres
+  </h1>
+
+  <div class="bg-white rounded-xl shadow shadow-lg shadow-gray-500/50 p-6">
+    <form id="setForm" class="grid md:grid-cols-3 gap-4">
+      <div>
+        <label class="label"><span class="label-text">Thème</span></label>
+        <select id="theme" class="select select-bordered w-full bg-blue-50">
+          <option value="system">Système</option>
+          <option value="light">Clair</option>
+          <option value="dark">Sombre</option>
+        </select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Langue</span></label>
+        <select id="locale" class="select select-bordered w-full w-full bg-blue-50">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Fuseau horaire</span></label>
+        <input id="timezone" class="input input-bordered w-full w-full bg-blue-50" placeholder="Africa/Abidjan">
+      </div>
+
+      <div>
+        <label class="label"><span class="label-text">Format de date</span></label>
+        <select id="date_format" class="select select-bordered w-full w-full bg-blue-50">
+          <option value="YYYY-MM-DD">2025-08-19</option>
+          <option value="DD/MM/YYYY">19/08/2025</option>
+          <option value="MM/DD/YYYY">08/19/2025</option>
+        </select>
+      </div>
+      <div class="md:col-span-2 flex items-end gap-4">
+        <label class="flex items-center gap-2">
+          <input id="two_factor_enabled" type="checkbox" class="checkbox checkbox-primary">
+          Activer la double authentification (2FA)
+        </label>
+        <button id="saveBtn" type="button" class="btn bg-blue-600 hover:bg-blue-700 text-white">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  (function(){
+    const el = id => document.getElementById(id);
+    const toast = msg => alert(msg);
+
+    async function api(url, opts={}) {
+      const r = await fetch(url, { credentials:'same-origin', headers:{'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken}, ...opts });
+      if(!r.ok) throw new Error((await r.text())||r.status);
+      return r.json();
+    }
+
+    async function load() {
+      const s = await api('/api/v1/a_account/settings/me/');
+      el('theme').value = s.theme || 'system';
+      el('locale').value = s.locale || 'fr';
+      el('timezone').value = s.timezone || 'Africa/Abidjan';
+      el('date_format').value = s.date_format || 'YYYY-MM-DD';
+      el('two_factor_enabled').checked = !!s.two_factor_enabled;
+      // Optional: instantly apply theme
+      document.documentElement.dataset.theme = s.theme || 'light';
+    }
+
+    async function save() {
+      const payload = {
+        theme: el('theme').value,
+        locale: el('locale').value,
+        timezone: el('timezone').value,
+        date_format: el('date_format').value,
+        two_factor_enabled: el('two_factor_enabled').checked,
+      };
+      try {
+        const res = await api('/api/v1/a_account/settings/me/', { method:'PATCH', body: JSON.stringify(payload) });
+        toast('Paramètres enregistrés');
+        document.documentElement.dataset.theme = res.theme || 'light';
+      } catch(e) { toast('Erreur: ' + e.message); }
+    }
+
+    el('saveBtn').addEventListener('click', save);
+    document.addEventListener('DOMContentLoaded', load);
+  })();
+</script>
+{% endblock %}
+

@@ -1,0 +1,364 @@
+{% extends 'main/base.html' %}
+{% block title %}Paie — Profil de rémunération{% endblock %}
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+        <i class="fas fa-user-tie"></i> Profil de rémunération
+      </h1>
+
+      <!-- Head -->
+      <div id="empHead" class="mt-2 text-base-gray">Chargement employé #{{ employee_id }}…</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <!-- Contracts -->
+            <div class="bg-white rounded-2xl shadow-md hover:shadow-lg transition p-5">
+                <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-lg font-semibold text-blue-600 flex items-center">
+                    <i class="fas fa-file-signature mr-2 text-blue-600"></i> Contrats
+                </h2>
+                {% if request.user.role in 'ADMIN,HR' %}
+                <button id="btnNewContract" class="px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700 transition text-sm cursor-pointer">
+                    <i class="fas fa-plus"></i>
+                </button>
+                {% endif %}
+                </div>
+                <div class="overflow-x-auto mt-4">
+                <table class="table w-full text-sm">
+                    <thead class="bg-gray-50">
+                    <tr class="text-gray-600 text-left">
+                        <th class="whitespace-nowrap text-blue-600 py-2">Type</th>
+                        <th class="whitespace-nowrap text-blue-600">Début</th>
+                        <th class="whitespace-nowrap text-blue-600">Fin</th>
+                        <th class="whitespace-nowrap text-blue-600">Statut</th>
+                        <th class="whitespace-nowrap text-blue-600">Salaire</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="contractsTbody">
+                    <tr><td colspan="6" class="text-center py-4 text-gray-400">Aucun contrat</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Recurring comps -->
+            <div class="bg-white rounded-2xl shadow-md hover:shadow-lg transition p-5">
+                <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-lg font-semibold text-indigo-600 flex items-center">
+                    <i class="fas fa-repeat mr-2 text-indigo-600"></i> Avantages/Déductions récurrents
+                </h2>
+                {% if request.user.role in 'ADMIN,HR' %}
+                <button id="btnNewRec" class="px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700 transition text-sm cursor-pointer">
+                    <i class="fas fa-plus"></i>
+                </button>
+                {% endif %}
+                </div>
+                <div class="overflow-x-auto mt-4">
+                <table class="table w-full text-sm">
+                    <thead class="bg-gray-50">
+                    <tr class="text-gray-600 text-left">
+                        <th class="whitespace-nowrap text-blue-600 py-2">Composant</th>
+                        <th class="whitespace-nowrap text-blue-600">Montant</th>
+                        <th class="whitespace-nowrap text-blue-600">%</th>
+                        <th class="whitespace-nowrap text-blue-600">Début</th>
+                        <th class="whitespace-nowrap text-blue-600"> Fin</th>
+                        <th class="whitespace-nowrap text-blue-600">Actif</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="recTbody">
+                    <tr><td colspan="7" class="text-center py-4 text-gray-400">Aucun avantage/déduction</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payslips -->
+        <div class="bg-white rounded-2xl shadow-md hover:shadow-lg transition p-5 mt-6">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-lg font-semibold text-red-500 flex items-center">
+                <i class="fas fa-file-invoice-dollar mr-2 text-red-500"></i> Bulletins récents
+                </h2>
+            </div>
+            <div class="overflow-x-auto mt-4">
+                <table class="table w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr class="text-gray-600 text-left">
+                    <th class="whitespace-nowrap text-blue-600 py-2">Période</th>
+                    <th class="whitespace-nowrap text-blue-600">Brut</th>
+                    <th class="whitespace-nowrap text-blue-600">Net</th>
+                    <th class="whitespace-nowrap text-blue-600">Statut</th>
+                    <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="psTbody">
+                    <tr><td colspan="5" class="text-center py-4 text-gray-400">Aucun bulletin</td></tr>
+                </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Contract Modal -->
+<input type="checkbox" id="contractModal" class="modal-toggle" />
+<div class="modal"><div class="modal-box bg-white border-l-4 border-orange-600">
+  <h3 class="font-bold text-lg mb-2" id="cTitle">Nouveau contrat</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div><label class="label"><span class="label-text">Type</span></label>
+      <select id="c_type" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+        <option value="PERMANENT">Permanent</option>
+        <option value="CONTRACTUAL">Contractuel</option>
+        <option value="TEMPORARY">Temporaire</option>
+      </select>
+    </div>
+    <div><label class="label"><span class="label-text">Salaire</span></label>
+      <input id="c_salary" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div><label class="label"><span class="label-text">Début</span></label>
+      <input id="c_start" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div><label class="label"><span class="label-text">Fin</span></label>
+      <input id="c_end" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div class="md:col-span-2"><label class="label"><span class="label-text">Statut</span></label>
+      <select id="c_status" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+        <option value="ACTIVE">Actif</option><option value="EXPIRED">Expiré</option><option value="TERMINATED">Terminé</option>
+      </select>
+    </div>
+    <div class="md:col-span-2"><label class="label"><span class="label-text">Notes</span></label>
+      <textarea id="c_notes" class="textarea textarea-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></textarea>
+    </div>
+  </div>
+  <div class="modal-action">
+    <label for="contractModal" class="btn btn-ghost">Annuler</label>
+    <button id="c_save" class="btn bg-orange-600 text-white">Enregistrer</button>
+  </div>
+</div></div>
+
+<!-- Recurring Modal -->
+<input type="checkbox" id="recModal" class="modal-toggle" />
+<div class="modal"><div class="modal-box bg-white border-l-4 border-orange-600">
+  <h3 class="font-bold text-lg mb-2" id="rTitle">Nouvel élément récurrent</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="md:col-span-2"><label class="label"><span class="label-text">Composant</span></label>
+      <select id="r_comp" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></select>
+    </div>
+    <div><label class="label"><span class="label-text">Montant</span></label>
+      <input id="r_amount" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" value="0">
+    </div>
+    <div><label class="label"><span class="label-text">Pourcentage</span></label>
+      <input id="r_pct" type="number" step="0.0001" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div><label class="label"><span class="label-text">Début</span></label>
+      <input id="r_start" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div><label class="label"><span class="label-text">Fin</span></label>
+      <input id="r_end" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+    <div class="md:col-span-2"><label class="label"><span class="label-text">Note</span></label>
+      <input id="r_note" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+    </div>
+  </div>
+  <div class="modal-action">
+    <label for="recModal" class="btn btn-ghost">Annuler</label>
+    <button id="r_save" class="btn bg-orange-600 text-white">Enregistrer</button>
+  </div>
+</div></div>
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+(async function(){
+  const EMP_ID = {{ employee_id|safe }};
+  const EMP_SLUG = {{ employee_id|safe }};
+  const empHead = document.getElementById('empHead');
+  const cTbody = document.getElementById('contractsTbody');
+  const rTbody = document.getElementById('recTbody');
+  const psTbody = document.getElementById('psTbody');
+
+  // Utils
+  const fmtMoney = (v)=> Number(v||0).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const periodOf = (p)=>{
+    // Prefer denormalized fields if you add them later (run_month/run_year)
+    if (p.run_month && p.run_year) return `${String(p.run_month).padStart(2,'0')}/${p.run_year}`;
+    // Otherwise, try nested run, or fallback to created_at
+    if (p.run?.month && p.run?.year) return `${String(p.run.month).padStart(2,'0')}/${p.run.year}`;
+    if (p.month && p.year) return `${String(p.month).padStart(2,'0')}/${p.year}`;
+    if (p.created_at) return p.created_at.slice(0,7).replace('-', '/');
+    return '—';
+  };
+
+  // Header: load the TARGET employee, not /me
+  async function loadEmployee(){
+    try{
+      const r = await fetch(`/api/v1/employees/${EMP_ID}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      if (!r.ok) throw new Error();
+      const e = await r.json();
+      empHead.innerHTML = `<span class="font-semibold">${e.first_name} ${e.last_name}</span> — Grade: ${e.grade?.name||'—'} — Département: ${e.department?.name||'—'}`;
+    }catch{
+      empHead.textContent = `Employé #${EMP_ID} introuvable`;
+    }
+  }
+
+
+
+  // Contracts (use EMP_ID)
+  async function loadContracts(){
+    try{
+      // const r = await fetch(`/api/v1/contracts/?employee=${EMP_ID}&page_size=100`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      const r = await fetch(`/api/v1/compensation/${encodeURIComponent(EMP_SLUG)}/`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      const d = await r.json(); const rows = d.results || d || [];
+      if (!rows.length){ cTbody.innerHTML = `<tr><td colspan="6" class="text-center text-base-gray">Aucun contrat</td></tr>`; return; }
+      cTbody.innerHTML = rows.map(x=>`<tr>
+        <td>${x.contract_type}</td>
+        <td>${x.start_date}</td>
+        <td>${x.end_date||'—'}</td>
+        <td>${x.status}</td>
+        <td>${fmtMoney(x.salary)}</td>
+        <td class="text-right"><button class="btn btn-xs" data-ce="${x.id}"><i class="fas fa-pen"></i></button></td>
+      </tr>`).join('');
+      cTbody.querySelectorAll('[data-ce]').forEach(b=> b.addEventListener('click', ()=> openContractEdit(b.dataset.ce)));
+    }catch{
+      cTbody.innerHTML = `<tr><td colspan="6" class="text-center text-base-gray">Erreur de chargement</td></tr>`;
+    }
+  }
+  function openContractEdit(id){
+    fetch(`/api/v1/contracts/${id}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}}).then(r=>r.json()).then(x=>{
+      document.getElementById('cTitle').textContent='Modifier contrat';
+      document.getElementById('c_type').value=x.contract_type;
+      document.getElementById('c_salary').value=x.salary;
+      document.getElementById('c_start').value=x.start_date;
+      document.getElementById('c_end').value=x.end_date||'';
+      document.getElementById('c_status').value=x.status;
+      document.getElementById('c_notes').value=x.notes||'';
+      document.getElementById('c_save').dataset.id = x.id;
+      document.getElementById('contractModal').checked=true;
+    });
+  }
+  document.getElementById('btnNewContract').addEventListener('click', ()=>{
+    document.getElementById('cTitle').textContent='Nouveau contrat';
+    ['c_type','c_salary','c_start','c_end','c_status','c_notes'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('c_status').value='ACTIVE';
+    delete document.getElementById('c_save').dataset.id;
+    document.getElementById('contractModal').checked=true;
+  });
+  document.getElementById('c_save').addEventListener('click', async ()=>{
+    const payload = {
+      employee_id: EMP_ID,
+      contract_type: document.getElementById('c_type').value,
+      salary: document.getElementById('c_salary').value,
+      start_date: document.getElementById('c_start').value,
+      end_date: document.getElementById('c_end').value || null,
+      status: document.getElementById('c_status').value,
+      notes: document.getElementById('c_notes').value
+    };
+    const id = document.getElementById('c_save').dataset.id;
+    const url = id ? `/api/v1/contracts/${id}/` : `/api/v1/contracts/`;
+    const method = id ? 'PATCH' : 'POST';
+    const r = await fetch(url, { method, headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify(payload) });
+    if (!r.ok){ alert('Erreur'); return; }
+    document.getElementById('contractModal').checked=false; loadContracts();
+  });
+
+  // Components for recurring
+  async function loadComponents(){
+    const r = await fetch('/api/v1/components/?page_size=200', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const d = await r.json(); const rows = d.results || d || [];
+    document.getElementById('r_comp').innerHTML = rows.map(c=>`<option value="${c.id}">${c.code} — ${c.name}</option>`).join('');
+  }
+
+  // Recurring (use EMP_ID)
+  async function loadRecurring(){
+    try{
+      // const r = await fetch(`/api/v1/recurring/?employee=${EMP_ID}&page_size=100`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      const r = await fetch(`/api/v1/compensation/${encodeURIComponent(EMP_SLUG)}/`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      const d = await r.json(); const rows = d.results || d || [];
+      if (!rows.length){ rTbody.innerHTML = `<tr><td colspan="7" class="text-center text-base-gray">Aucun élément</td></tr>`; return; }
+      rTbody.innerHTML = rows.map(x=>`<tr>
+        <td>${x.component?.code}</td>
+        <td>${fmtMoney(x.amount)}</td>
+        <td>${x.percentage || ''}</td>
+        <td>${x.start_date}</td>
+        <td>${x.end_date||'—'}</td>
+        <td>${x.active?'Oui':'Non'}</td>
+        <td class="text-right"><button class="btn btn-xs" data-re="${x.id}"><i class="fas fa-pen"></i></button></td>
+      </tr>`).join('');
+      rTbody.querySelectorAll('[data-re]').forEach(b=> b.addEventListener('click', ()=> openRecEdit(b.dataset.re)));
+    }catch{
+      rTbody.innerHTML = `<tr><td colspan="7" class="text-center text-base-gray">Erreur de chargement</td></tr>`;
+    }
+  }
+  function openRecEdit(id){
+    fetch(`/api/v1/recurring/${id}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}}).then(r=>r.json()).then(x=>{
+      document.getElementById('rTitle').textContent='Modifier élément';
+      document.getElementById('r_comp').value=x.component?.id || '';
+      document.getElementById('r_amount').value=x.amount || 0;
+      document.getElementById('r_pct').value=x.percentage || '';
+      document.getElementById('r_start').value=x.start_date || '';
+      document.getElementById('r_end').value=x.end_date || '';
+      document.getElementById('r_note').value=x.note || '';
+      document.getElementById('r_save').dataset.id = x.id;
+      document.getElementById('recModal').checked=true;
+    });
+  }
+  document.getElementById('btnNewRec').addEventListener('click', ()=>{
+    document.getElementById('rTitle').textContent='Nouvel élément';
+    ['r_amount','r_pct','r_start','r_end','r_note'].forEach(id=>document.getElementById(id).value='');
+    delete document.getElementById('r_save').dataset.id;
+    document.getElementById('recModal').checked=true;
+  });
+  document.getElementById('r_save').addEventListener('click', async ()=>{
+    const payload = {
+      employee_id: EMP_ID,
+      component_id: document.getElementById('r_comp').value,
+      amount: document.getElementById('r_amount').value,
+      percentage: document.getElementById('r_pct').value || null,
+      start_date: document.getElementById('r_start').value,
+      end_date: document.getElementById('r_end').value || null,
+      note: document.getElementById('r_note').value,
+      active: true
+    };
+    const id = document.getElementById('r_save').dataset.id;
+    const url = id ? `/api/v1/recurring/${id}/` : `/api/v1/recurring/`;
+    const method = id ? 'PATCH' : 'POST';
+    const r = await fetch(url, { method, headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify(payload) });
+    if (!r.ok){ alert('Erreur'); return; }
+    document.getElementById('recModal').checked=false; loadRecurring();
+  });
+
+  // Payslips (use EMP_ID)
+  async function loadPayslips(){
+    try{
+      const r = await fetch(`/api/v1/payslips/?page_size=12&employee=${EMP_ID}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      const d = await r.json(); const rows = d.results || d || [];
+      if (!rows.length){ psTbody.innerHTML = `<tr><td colspan="5" class="text-center text-base-content/60">Aucun bulletin</td></tr>`; return; }
+      psTbody.innerHTML = rows.map(p=>`<tr>
+        <td>${periodOf(p)}</td>
+        <td>${fmtMoney(p.gross_pay)}</td>
+        <td>${fmtMoney(p.net_pay)}</td>
+        <td>${p.finalized ? '<span class="badge badge-success">Finalisé</span>' : '<span class="badge badge-warning">Provisionnel</span>'}</td>
+        <td class="text-right">
+          <a class="btn btn-xs bg-indigo-100 text-indigo-800 hover:bg-indigo-200" href="/api/v1/payslips/${p.id}/pdf/" target="_blank">
+            <i class="fas fa-file-pdf mr-1 text-red-500"></i> PDF
+          </a>
+        </td>
+      </tr>`).join('');
+    }catch{
+      psTbody.innerHTML = `<tr><td colspan="5" class="text-center text-base-content/60">Erreur de chargement</td></tr>`;
+    }
+  }
+
+  await loadEmployee();
+  await loadComponents();
+  await loadContracts();
+  await loadRecurring();
+  await loadPayslips();
+})();
+</script>
+{% endblock %}

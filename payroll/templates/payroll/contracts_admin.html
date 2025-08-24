@@ -1,0 +1,341 @@
+{% extends 'main/base.html' %}
+{% block title %}Paie — Tous les contrats{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-file-signature"></i> Tous les contrats
+        </h1>
+        <button id="btnNew" class="btn bg-orange-600 hover:bg-orange-700 text-white">
+          <i class="fas fa-plus mr-2"></i> Nouveau
+        </button>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4">
+        <div class="md:col-span-2">
+          <label class="label"><span class="label-text">Employé (recherche)</span></label>
+          <input id="empSearch" type="text" class="input input-bordered w-full bg-blue-50" placeholder="Rechercher par Nom / Matricule">
+          <div id="empResults" class="mt-1 bg-white border rounded-lg hidden max-h-56 overflow-auto"></div>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Statut</span></label>
+          <select id="statusSel" class="select select-bordered w-full bg-blue-50">
+            <option value="">Tous</option>
+            <option value="ACTIVE">Actif</option>
+            <option value="EXPIRED">Expiré</option>
+            <option value="TERMINATED">Terminé</option>
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <label class="label"><span class="label-text">Tri</span></label>
+          <div class="flex gap-2">
+            <button data-sort="start_date" class="btn btn-sm bg-blue-300">Début</button>
+            <button data-sort="-salary" class="btn btn-sm bg-blue-300">Salaire (desc)</button>
+            <button data-sort="-start_date" class="btn btn-sm bg-blue-300">Récent</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-x-auto mt-4 bg-gray-50">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap text-blue-600">Employé</th>
+              <th class="whitespace-nowrap text-blue-600">Type</th>
+              <th class="whitespace-nowrap text-blue-600">Début</th>
+              <th class="whitespace-nowrap text-blue-600">Fin</th>
+              <th class="whitespace-nowrap text-blue-600">Statut</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Salaire</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ctTbody">
+            <tr><td colspan="7" class="text-center text-base-gray">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pager -->
+      <div class="mt-3 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-200">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-200">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<input type="checkbox" id="editModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 id="mTitle" class="font-bold text-lg mb-2">Nouveau contrat</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Employé</span></label>
+        <input id="mEmployee" type="text" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" placeholder="Rechercher employé">
+        <input id="mEmployeeId" type="hidden">
+        <div id="mEmpResults" class="mt-1 bg-white border rounded-lg hidden max-h-56 overflow-auto"></div>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Type</span></label>
+        <select id="mType" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+          <option value="PERMANENT">Permanent</option>
+          <option value="CONTRACTUAL">Contractuel</option>
+          <option value="TEMPORARY">Temporaire</option>
+        </select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Salaire</span></label>
+        <input id="mSalary" type="number" step="0.01" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Début</span></label>
+        <input id="mStart" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Fin</span></label>
+        <input id="mEnd" type="date" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Statut</span></label>
+        <select id="mStatus" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+          <option value="ACTIVE">Actif</option>
+          <option value="EXPIRED">Expiré</option>
+          <option value="TERMINATED">Terminé</option>
+        </select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Notes</span></label>
+        <textarea id="mNotes" class="textarea textarea-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></textarea>
+      </div>
+    </div>
+    <div class="modal-action">
+      <label for="editModal" class="btn btn-ghost">Annuler</label>
+      <button id="mSave" class="btn bg-orange-600 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<input type="checkbox" id="delModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg mb-2">Supprimer ce contrat ?</h3>
+    <p class="text-sm text-gray-600">Cette action est irréversible.</p>
+    <div class="modal-action">
+      <label for="delModal" class="btn btn-ghost">Annuler</label>
+      <button id="delYes" class="btn bg-red-600 hover:bg-red-700 text-white">Supprimer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // ----- helpers -----
+  function getCookie(n){ const m = document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)'); return m?m.pop():''; }
+  async function csrfFetch(url, opts={}){
+    const headers = Object.assign({'X-Requested-With':'XMLHttpRequest','X-CSRFToken':getCookie('csrftoken')}, opts.headers||{});
+    return fetch(url, Object.assign({}, opts, {headers}));
+  }
+  const fmt = (v)=> Number(v||0).toLocaleString('fr-FR',{minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const state = { page:1, size:10, sort:'-start_date', employee:null };
+
+  const tbody = document.getElementById('ctTbody');
+  const pageInfo = document.getElementById('pageInfo');
+
+  async function searchEmployees(q){
+    if(!q || q.length<2){ return []; }
+    const r = await fetch(`/api/v1/employees/?search=${encodeURIComponent(q)}&page_size=10`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const d = await r.json(); return d.results || d || [];
+  }
+
+  // Sidebar search box (filter table)
+  const empSearch = document.getElementById('empSearch');
+  const empResults = document.getElementById('empResults');
+  empSearch.addEventListener('input', async ()=>{
+    const rows = await searchEmployees(empSearch.value);
+    if(!rows.length){ empResults.classList.add('hidden'); return; }
+    empResults.innerHTML = rows.map(e=>`<div data-id="${e.id}" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">${e.first_name} ${e.last_name} — ${e.matricule||''}</div>`).join('');
+    empResults.classList.remove('hidden');
+    empResults.querySelectorAll('[data-id]').forEach(el=>{
+      el.onclick = ()=>{ state.employee = el.dataset.id; empSearch.value = el.textContent.trim(); empResults.classList.add('hidden'); load(); };
+    });
+  });
+
+  document.getElementById('statusSel').addEventListener('change', ()=>{ state.page=1; load(); });
+  document.querySelectorAll('[data-sort]').forEach(b=>{
+    b.onclick = ()=>{ state.sort = b.dataset.sort; load(); };
+  });
+
+  async function load(){
+    const params = new URLSearchParams();
+    params.set('page', state.page); params.set('page_size', state.size);
+    const status = document.getElementById('statusSel').value;
+    if(status) params.set('status', status);
+    if(state.employee) params.set('employee', state.employee);
+    // server ordering is basic; we'll client-highlight top salaries
+    const r = await fetch(`/api/v1/contracts/?${params.toString()}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const d = await r.json(); const rows = d.results || d || [];
+    if(!rows.length){ tbody.innerHTML = `<tr><td colspan="7" class="text-center text-base-gray">Aucun contrat</td></tr>`; pageInfo.textContent = ''; return; }
+
+    // find “top” by salary (top 5 of current page)
+    const topIds = rows
+      .slice().sort((a,b)=> Number(b.salary||0) - Number(a.salary||0))
+      .slice(0,5).map(x=>x.id);
+
+    tbody.innerHTML = rows.map(x=>{
+      const name = `${x.employee?.first_name||''} ${x.employee?.last_name||''}`.trim();
+      const top = topIds.includes(x.id);
+      const rowCls = top ? 'bg-yellow-50 ring-1 ring-yellow-300' : '';
+      const star = top ? '<i class="fas fa-star text-yellow-500 mr-1"></i>' : '';
+      return `<tr class="${rowCls}">
+        <td>${star}${name||'—'} <span class="text-xs text-gray-500">${x.employee?.matricule||''}</span></td>
+        <td>${x.contract_type}</td>
+        <td>${x.start_date||'—'}</td>
+        <td>${x.end_date||'—'}</td>
+        <td>${x.status}</td>
+        <td class="text-right">${fmt(x.salary)}</td>
+        <td class="text-right">
+          <button class="btn btn-xs btn-ghost text-orange-300" data-edit="${x.id}"><i class="fas fa-pen"></i></button>
+          <button class="btn btn-xs btn-ghost text-red-600" data-del="${x.id}"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+    pageInfo.textContent = d.count ? `Page ${state.page} — ${d.count} éléments` : `Page ${state.page}`;
+
+    tbody.querySelectorAll('[data-edit]').forEach(b=> b.onclick = ()=> openEdit(b.dataset.edit));
+    tbody.querySelectorAll('[data-del]').forEach(b=> b.onclick = ()=> openDelete(b.dataset.del));
+  }
+
+  // Paging
+  document.getElementById('prevPage').onclick = ()=>{ if(state.page>1){ state.page--; load(); } };
+  document.getElementById('nextPage').onclick = ()=>{ state.page++; load(); };
+
+  // Create/Edit modal
+  const editModal = document.getElementById('editModal');
+  const mTitle = document.getElementById('mTitle');
+  const mEmployee = document.getElementById('mEmployee');
+  const mEmployeeId = document.getElementById('mEmployeeId');
+  const mEmpResults = document.getElementById('mEmpResults');
+  const mType = document.getElementById('mType');
+  const mSalary = document.getElementById('mSalary');
+  const mStart = document.getElementById('mStart');
+  const mEnd = document.getElementById('mEnd');
+  const mStatus = document.getElementById('mStatus');
+  const mNotes = document.getElementById('mNotes');
+  const mSave = document.getElementById('mSave');
+
+  function resetModal(){
+    mEmployee.value=''; mEmployeeId.value='';
+    mType.value='PERMANENT'; mSalary.value=''; mStart.value=''; mEnd.value='';
+    mStatus.value='ACTIVE'; mNotes.value=''; delete mSave.dataset.id;
+  }
+
+  mEmployee.addEventListener('input', async ()=>{
+    const rows = await searchEmployees(mEmployee.value);
+    if(!rows.length){ mEmpResults.classList.add('hidden'); return; }
+    mEmpResults.innerHTML = rows.map(e=>`<div data-id="${e.id}" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">${e.first_name} ${e.last_name} — ${e.matricule||''}</div>`).join('');
+    mEmpResults.classList.remove('hidden');
+    mEmpResults.querySelectorAll('[data-id]').forEach(el=>{
+      el.onclick = ()=>{ mEmployee.value = el.textContent.trim(); mEmployeeId.value = el.dataset.id; mEmpResults.classList.add('hidden'); };
+    });
+  });
+
+  document.getElementById('btnNew').onclick = ()=>{
+    resetModal(); mTitle.textContent='Nouveau contrat'; editModal.checked = true;
+  };
+
+  async function openEdit(id){
+    resetModal();
+    const r = await fetch(`/api/v1/contracts/${id}/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const c = await r.json();
+    mTitle.textContent = 'Modifier contrat';
+    mEmployee.value = `${c.employee?.first_name||''} ${c.employee?.last_name||''}`.trim();
+    mEmployeeId.value = c.employee?.id || '';
+    mType.value = c.contract_type || 'PERMANENT';
+    mSalary.value = c.salary || '';
+    mStart.value = c.start_date || '';
+    mEnd.value = c.end_date || '';
+    mStatus.value = c.status || 'ACTIVE';
+    mNotes.value = c.notes || '';
+    mSave.dataset.id = c.id;
+    editModal.checked = true;
+  }
+
+  mSave.onclick = async ()=>{
+    const payload = {
+      employee: mEmployeeId.value || state.employee,
+      contract_type: mType.value,
+      salary: mSalary.value,
+      start_date: mStart.value,
+      end_date: mEnd.value || null,
+      status: mStatus.value,
+      notes: mNotes.value
+    };
+    if(!payload.employee){ return showToast('Sélectionnez un employé', 'error'); }
+    const id = mSave.dataset.id;
+    const url = id ? `/api/v1/contracts/${id}/` : `/api/v1/contracts/`;
+    const method = id ? 'PATCH' : 'POST';
+    const r = await csrfFetch(url, {
+      method, headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok){
+      const e = await r.json().catch(()=>({detail:'Erreur'}));
+      return showToast(e.detail || 'Échec de sauvegarde', 'error');
+    }
+    editModal.checked = false; showToast('Enregistré', 'success'); load();
+  };
+
+  // Delete
+  const delModal = document.getElementById('delModal');
+  const delYes = document.getElementById('delYes');
+  function openDelete(id){
+    delYes.dataset.id = id;
+    delModal.checked = true;
+  }
+  delYes.onclick = async ()=>{
+    const id = delYes.dataset.id;
+    const r = await csrfFetch(`/api/v1/contracts/${id}/`, { method:'DELETE' });
+    delModal.checked = false;
+    if(!r.ok){ return showToast('Suppression échouée', 'error'); }
+    showToast('Supprimé', 'success'); load();
+  };
+
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1"><p class="text-sm font-medium">${message}</p></div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+    // Initial load
+
+  load();
+})();
+</script>
+{% endblock %}

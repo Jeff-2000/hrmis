@@ -1,0 +1,138 @@
+{# templates/accounts/notification_settings.html #}
+{% extends 'main/base.html' %}
+{% block content %}
+<div class="container mx-auto px-4 py-6 space-y-6">
+  <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2">
+    <i class="fas fa-bell"></i> Paramètres de notification
+  </h1>
+
+  <div class="bg-white rounded-xl shadow shadow-lg shadow-blue-500/50 p-6">
+    <form id="prefForm" class="grid md:grid-cols-4 gap-4">
+      <div>
+        <label class="label"><span class="label-text">Canal</span></label>
+        <select id="channel" class="select select-bordered w-full bg-blue-50">
+          <option value="EMAIL">Email</option>
+          <option value="SMS">SMS</option>
+          <option value="WHATSAPP">WhatsApp</option>
+        </select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Contact</span></label>
+        <input id="contact" class="input input-bordered w-full bg-blue-50" placeholder="email ou +225XXXXXXXXX">
+      </div>
+      <div class="flex items-end gap-3">
+        <label class="flex items-center gap-2">
+          <input id="is_active" type="checkbox" class="checkbox checkbox-primary" checked>
+          Actif
+        </label>
+        <button id="savePref" type="button" class="btn bg-blue-600 text-white hover:bg-blue-700">Enregistrer</button>
+      </div>
+    </form>
+    <p class="text-xs text-gray-500 mt-2">Une seule préférence active est autorisée (le modèle la force).</p>
+  </div>
+
+  <div class="bg-white rounded-xl shadow shadow-lg shadow-gray-500/50 p-6">
+    <h3 class="text-lg font-semibold mb-4">Mes préférences</h3>
+    <div id="prefList" class="space-y-2"></div>
+  </div>
+</div>
+
+<script>
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+(function() {
+  const el = id => document.getElementById(id);
+  const toast = msg => alert(msg);
+
+  async function api(url, opts={}) {
+    const r = await fetch(url, { credentials:'same-origin', headers:{'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken}, ...opts });
+    if(!r.ok) throw new Error((await r.text()) || r.status);
+    return r.json();
+  }
+
+  function inputPatternByChannel(ch) {
+    if(ch==='EMAIL') return {type:'email', pattern:'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}', placeholder:'user@example.com'};
+    return {type:'tel', pattern:'\\+[0-9]{10,15}', placeholder:'+2250102030405'};
+  }
+
+  async function loadPrefs() {
+    const data = await api('/api/v1/notifications/preferences/');
+    const items = (data.results || data || []).map(p => `
+      <div class="p-3 border rounded-lg flex items-center justify-between">
+        <div>
+          <div class="font-medium">${p.channel} → ${p.contact}</div>
+          <div class="text-xs text-gray-500">Actif: ${p.is_active ? 'Oui' : 'Non'} • Créé: ${new Date(p.created_at).toLocaleString('fr-FR')}</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-sm bg-yellow-500 hover:bg-yellow-600 text-white" data-edit="${p.id}"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-sm bg-red-600 hover:bg-red-700 text-white" data-del="${p.id}"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>
+    `).join('');
+    el('prefList').innerHTML = items || '<div class="text-gray-500">Aucune préférence.</div>';
+
+    // hooks
+    el('prefList').querySelectorAll('[data-edit]').forEach(btn => btn.onclick = () => editPref(btn.getAttribute('data-edit')));
+    el('prefList').querySelectorAll('[data-del]').forEach(btn => btn.onclick = () => delPref(btn.getAttribute('data-del')));
+  }
+
+  async function editPref(id) {
+    const p = await api(`/api/v1/notifications/preferences/${id}/`);
+    el('channel').value = p.channel;
+    el('contact').value = p.contact;
+    el('is_active').checked = !!p.is_active;
+    el('savePref').setAttribute('data-id', id);
+    applyChannelMask();
+  }
+
+  async function delPref(id) {
+    if(!confirm('Supprimer cette préférence ?')) return;
+    await fetch(`/api/v1/notifications/preferences/${id}/`, { method:'DELETE', credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken} });
+    toast('Supprimé');
+    loadPrefs();
+  }
+
+  async function save() {
+    const id = el('savePref').getAttribute('data-id');
+    const payload = { channel: el('channel').value, contact: el('contact').value, is_active: el('is_active').checked };
+    const method = id ? 'PATCH' : 'POST';
+    const url = id ? `/api/v1/notifications/preferences/${id}/` : '/api/v1/notifications/preferences/';
+    try {
+      await api(url, { method, body: JSON.stringify(payload) });
+      toast('Enregistré');
+      el('savePref').removeAttribute('data-id');
+      el('prefForm').reset();
+      applyChannelMask();
+      loadPrefs();
+    } catch(e) { toast('Erreur: ' + e.message); }
+  }
+
+  function applyChannelMask() {
+    const ch = el('channel').value;
+    const cfg = inputPatternByChannel(ch);
+    el('contact').type = cfg.type;
+    el('contact').placeholder = cfg.placeholder;
+    el('contact').setAttribute('pattern', cfg.pattern);
+  }
+
+  el('channel').addEventListener('change', applyChannelMask);
+  el('savePref').addEventListener('click', save);
+  document.addEventListener('DOMContentLoaded', () => { applyChannelMask(); loadPrefs(); });
+})();
+</script>
+{% endblock %}

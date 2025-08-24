@@ -1,0 +1,315 @@
+{% extends 'main/base.html' %}
+{% block title %}Mes documents{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-folder-open"></i> Mes documents
+        </h1>
+        <!-- no create button on this page -->
+      </div>
+
+      <!-- Filtres -->
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mt-4">
+        <div class="md:col-span-2">
+          <label class="label"><span class="label-text">Concerne</span></label>
+          <div class="join w-full">
+            <button id="linkUser" class="join-item btn btn-sm bg-blue-100 text-blue-800">Mon compte (Utilisateur)</button>
+            <button id="linkEmployee" class="join-item btn btn-sm bg-gray-100 text-gray-500" title="Désactivé: ID employé non numérique">Mon profil (Employé)</button>
+          </div>
+          <div id="linkWarn" class="text-xs text-amber-600 mt-1 hidden">
+            Astuce: le filtrage par Employé est désactivé car l’ID employé n’est pas numérique.
+          </div>
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">Type</span></label>
+          <select id="fDocType" class="select select-bordered w-full bg-blue-50">
+            <option value="">Tous</option>
+            <option value="arrete">Arrêté</option>
+            <option value="certificat_medical">Certificat Médical</option>
+            <option value="contrat">Contrat</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">Statut</span></label>
+          <select id="fStatus" class="select select-bordered w-full bg-blue-50">
+            <option value="">Tous</option>
+            <option value="to_validate">À valider</option>
+            <option value="valide">Valide</option>
+            <option value="expiré">Expiré</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">Année min</span></label>
+          <input id="fYearFrom" type="number" class="input input-bordered w-full bg-blue-50" placeholder="YYYY">
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Année max</span></label>
+          <input id="fYearTo" type="number" class="input input-bordered w-full bg-blue-50" placeholder="YYYY">
+        </div>
+
+        <div class="md:col-span-3">
+          <label class="label"><span class="label-text">Recherche (texte / émis par)</span></label>
+          <input id="fQ" type="text" class="input input-bordered w-full bg-blue-50" placeholder="Mot-clé…">
+        </div>
+      </div>
+
+      <!-- Grille -->
+      <div id="cardsWrap" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+        <div class="col-span-full text-base-gray">Chargement…</div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="mt-4 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Éditer (pas de création) -->
+<input type="checkbox" id="docModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600 max-w-2xl">
+    <h3 class="font-bold text-lg mb-2" id="mTitle">Modifier le document</h3>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="label"><span class="label-text">Statut</span></label>
+        <select id="mStatus" class="select select-bordered w-full bg-blue-50">
+          <option value="to_validate">À valider</option>
+          <option value="valide">Valide</option>
+          <option value="expiré">Expiré</option>
+        </select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Date d'émission</span></label>
+        <input id="mDate" type="date" class="input input-bordered w-full bg-blue-50">
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Émis par</span></label>
+        <input id="mIssuedBy" type="text" class="input input-bordered w-full bg-blue-50" placeholder="Ex: Ministère, Service RH…">
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Contenu texte (optionnel)</span></label>
+        <textarea id="mText" class="textarea textarea-bordered w-full bg-blue-50" rows="4" placeholder="Notes…"></textarea>
+      </div>
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Remplacer le fichier (optionnel)</span></label>
+        <input id="mFile" type="file" class="file-input file-input-bordered w-full bg-blue-50" />
+      </div>
+    </div>
+
+    <div class="modal-action">
+      <label for="docModal" class="btn btn-ghost">Fermer</label>
+      <button id="mSave" class="btn bg-orange-600 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmation suppression -->
+<input type="checkbox" id="confirmDelModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-red-600">
+    <h3 class="font-bold text-lg text-red-600"><i class="fas fa-triangle-exclamation mr-2"></i>Supprimer le document ?</h3>
+    <p class="mt-2 text-sm">Cette action est irréversible.</p>
+    <div class="modal-action">
+      <label for="confirmDelModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnDoDelete" class="btn bg-red-600 text-white">Supprimer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // CSRF
+  function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+  }
+  const csrf = getCookie('csrftoken');
+  async function csrfFetch(url, opts={}){
+    opts.headers = Object.assign({'X-Requested-With':'XMLHttpRequest','X-CSRFToken':csrf}, opts.headers||{});
+    return fetch(url, opts);
+  }
+
+  const state = { page:1, pageSize:9, total:0, editId:null, pendingDeleteId:null };
+
+  const cardsWrap = document.getElementById('cardsWrap');
+  const pageInfo  = document.getElementById('pageInfo');
+
+  const fDocType  = document.getElementById('fDocType');
+  const fStatus   = document.getElementById('fStatus');
+  const fYearFrom = document.getElementById('fYearFrom');
+  const fYearTo   = document.getElementById('fYearTo');
+  const fQ        = document.getElementById('fQ');
+
+  // modal elems
+  const modalToggle = document.getElementById('docModal');
+  const mStatus  = document.getElementById('mStatus');
+  const mDate    = document.getElementById('mDate');
+  const mIssuedBy= document.getElementById('mIssuedBy');
+  const mText    = document.getElementById('mText');
+  const mFile    = document.getElementById('mFile');
+  const mSave    = document.getElementById('mSave');
+
+  // delete confirm
+  const confirmDelToggle = document.getElementById('confirmDelModal');
+  const btnDoDelete = document.getElementById('btnDoDelete');
+
+  function badge(status){
+    if(status==='to_validate') return '<span class="badge bg-yellow-100 text-yellow-800">À valider</span>';
+    if(status==='expiré')     return '<span class="badge bg-red-100 text-red-800">Expiré</span>';
+    return '<span class="badge bg-green-100 text-green-800">Valide</span>';
+  }
+  const typeLabel = {
+    arrete: 'Arrêté',
+    certificat_medical: 'Certificat Médical',
+    contrat: 'Contrat',
+    autre: 'Autre'
+  };
+  function card(row){
+    const canEdit = row.status === 'to_validate';
+    const fileBtn = row.file ? 
+      `<a class="btn btn-xs bg-blue-100 text-blue-800 hover:bg-blue-200" href="${row.file}" target="_blank"><i class="fas fa-eye mr-1"></i>Ouvrir</a>` : '';
+    return `<div class="card bg-blue-50 border border-blue-200">
+      <div class="card-body">
+        <div class="flex items-center justify-between">
+          <h3 class="card-title text-orange-600"><i class="fas fa-file-alt mr-2"></i>${typeLabel[row.document_type]||row.document_type}</h3>
+          ${badge(row.status)}
+        </div>
+        <div class="mt-1 text-sm text-blue-900 space-y-1">
+          <div><span class="font-semibold">Émis par:</span> ${row.issued_by||'—'}</div>
+          <div><span class="font-semibold">Émis le:</span> ${row.issuance_date||'—'}</div>
+        </div>
+        <div class="card-actions justify-end mt-3">
+          ${fileBtn}
+          <button class="btn btn-xs ${canEdit?'bg-yellow-100 text-yellow-800 hover:bg-yellow-200':'bg-gray-100 text-gray-400 cursor-not-allowed'}" data-edit="${canEdit?row.id:''}" ${canEdit?'':'disabled'} title="${canEdit?'Modifier':'Modifiable uniquement quand “À valider”'}">
+            <i class="fas fa-pen"></i>
+          </button>
+          <button class="btn btn-xs ${canEdit?'bg-red-100 text-red-800 hover:bg-red-200':'bg-gray-100 text-gray-400 cursor-not-allowed'}" data-del="${canEdit?row.id:''}" ${canEdit?'':'disabled'} title="${canEdit?'Supprimer':'Supprimable uniquement quand “À valider”'}">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+    function params(){
+        const p = new URLSearchParams();
+        p.set('mine','1');               // <— keep this
+        p.set('page', state.page);
+        p.set('page_size', state.pageSize);
+        if (fDocType.value)  p.set('document_type', fDocType.value);
+        if (fStatus.value)   p.set('status', fStatus.value);
+        if (fYearFrom.value) p.set('year_from', fYearFrom.value);
+        if (fYearTo.value)   p.set('year_to', fYearTo.value);
+        if (fQ.value)        p.set('q', fQ.value);
+        return p;
+    }
+
+
+  async function loadDocs(){
+    cardsWrap.innerHTML = `<div class="col-span-full text-base-gray">Chargement…</div>`;
+    try{
+      const r = await fetch(`/api/v1/documents/documents/?${params().toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+      if(!r.ok){
+        const e = await r.json().catch(()=>({detail:'Erreur'}));
+        throw new Error(e.detail || 'Erreur de chargement');
+      }
+      const data = await r.json();
+      const rows = data.results || data || [];
+      state.total = data.count || rows.length;
+
+      if (!rows.length){
+        cardsWrap.innerHTML = `<div class="col-span-full text-base-gray">Aucun document</div>`;
+      }else{
+        cardsWrap.innerHTML = rows.map(card).join('');
+        cardsWrap.querySelectorAll('[data-edit]').forEach(b=>{
+          if(!b.dataset.edit) return;
+          b.addEventListener('click', ()=> openEdit(b.dataset.edit));
+        });
+        cardsWrap.querySelectorAll('[data-del]').forEach(b=>{
+          if(!b.dataset.del) return;
+          b.addEventListener('click', ()=> askDelete(b.dataset.del));
+        });
+      }
+      pageInfo.textContent = state.total ? `Page ${state.page} — ${state.total} éléments` : `Page ${state.page}`;
+    }catch(e){
+      cardsWrap.innerHTML = `<div class="col-span-full text-red-600">${e.message||'Erreur'}</div>`;
+    }
+  }
+
+  async function openEdit(id){
+    const r = await fetch(`/api/v1/documents/documents/${id}/`, { headers:{'X-Requested-With':'XMLHttpRequest'} });
+    if(!r.ok){ return showToast && showToast('Document introuvable', 'error'); }
+    const x = await r.json();
+    if (x.status !== 'to_validate'){
+      return showToast && showToast('Modifiable uniquement quand “À valider”.', 'warning');
+    }
+    state.editId = id;
+    document.getElementById('mTitle').textContent = `Modifier — ${typeLabel[x.document_type]||x.document_type}`;
+    mStatus.value   = x.status || 'to_validate';
+    mDate.value     = x.issuance_date || '';
+    mIssuedBy.value = x.issued_by || '';
+    mText.value     = x.content_text || '';
+    mFile.value     = '';
+    modalToggle.checked = true;
+  }
+
+  async function saveModal(){
+    if (!state.editId) return;
+    const fd = new FormData();
+    fd.append('status', mStatus.value);
+    if (mDate.value)     fd.append('issuance_date', mDate.value);
+    if (mIssuedBy.value) fd.append('issued_by', mIssuedBy.value);
+    if (mText.value)     fd.append('content_text', mText.value);
+    if (mFile.files[0])  fd.append('file', mFile.files[0]);
+
+    const r = await csrfFetch(`/api/v1/documents/documents/${state.editId}/`, { method:'PATCH', body: fd });
+    if(!r.ok){
+      const e = await r.json().catch(()=>({detail:'Erreur'}));
+      return (showToast && showToast(e.detail || Object.values(e)[0] || 'Erreur', 'error'));
+    }
+    modalToggle.checked = false;
+    (showToast && showToast('Enregistré', 'success'));
+    state.editId = null; loadDocs();
+  }
+
+  function askDelete(id){
+    state.pendingDeleteId = id;
+    confirmDelToggle.checked = true;
+  }
+
+  async function doDelete(){
+    if(!state.pendingDeleteId) return;
+    const r = await csrfFetch(`/api/v1/documents/documents/${state.pendingDeleteId}/`, { method:'DELETE' });
+    confirmDelToggle.checked = false;
+    if(!r.ok){ return showToast && showToast('Suppression impossible', 'error'); }
+    (showToast && showToast('Supprimé', 'success'));
+    state.pendingDeleteId = null; loadDocs();
+  }
+
+  [fDocType, fStatus, fYearFrom, fYearTo].forEach(el=> el.addEventListener('change', ()=>{ state.page=1; loadDocs(); }));
+  fQ.addEventListener('keyup', (e)=>{ if(e.key==='Enter'){ state.page=1; loadDocs(); } });
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){ state.page--; loadDocs(); }});
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadDocs(); });
+
+  // init
+  loadDocs();
+})();
+</script>
+{% endblock %}
+
+

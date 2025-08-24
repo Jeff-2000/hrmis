@@ -1,0 +1,172 @@
+{% extends 'main/base.html' %}
+{% block title %}Audit — Journal des actions{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2">
+          <i class="fas fa-shield-alt"></i> Journal d’audit
+        </h1>
+      </div>
+
+      <!-- Filtres -->
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mt-4">
+        <div>
+          <label class="label"><span class="label-text">Action</span></label>
+          <select id="fAction" class="select select-bordered w-full bg-blue-50">
+            <option value="">Toutes</option>
+            {% for a in actions %}
+              <option value="{{ a.value }}">{{ a.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">Utilisateur (id)</span></label>
+          <input id="fUser" class="input input-bordered w-full bg-blue-50" type="number" placeholder="actor id">
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">Objet (ContentType)</span></label>
+          <select id="fCT" class="select select-bordered w-full bg-blue-50">
+            <option value="">Tous</option>
+            {% for ct in contenttypes %}
+              <option value="{{ ct.id }}">{{ ct.app_label }}.{{ ct.model }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">Obj. PK</span></label>
+          <input id="fPK" class="input input-bordered w-full bg-blue-50" placeholder="clé (texte)">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="label"><span class="label-text">Recherche</span></label>
+          <input id="fQ" class="input input-bordered w-full bg-blue-50" placeholder="repr / changements">
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">Du</span></label>
+          <input id="fFrom" type="date" class="input input-bordered w-full bg-blue-50">
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Au</span></label>
+          <input id="fTo" type="date" class="input input-bordered w-full bg-blue-50">
+        </div>
+
+        <div>
+          <label class="label"><span class="label-text">IP</span></label>
+          <input id="fIP" class="input input-bordered w-full bg-blue-50" placeholder="remote addr">
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-x-auto mt-4 bg-gray-50">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="text-blue-600">Date</th>
+              <th class="text-blue-600">Utilisateur</th>
+              <th class="text-blue-600">Action</th>
+              <th class="text-blue-600">Objet</th>
+              <th class="text-blue-600">Repr.</th>
+              <th class="text-blue-600">IP</th>
+              <th class="text-blue-600 text-right">Voir</th>
+            </tr>
+          </thead>
+          <tbody id="tBody">
+            <tr><td colspan="7" class="text-center text-base-gray">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pager -->
+      <div class="mt-3 flex items-center gap-2">
+        <button id="prevPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Préc</button>
+        <span id="pageInfo" class="text-sm"></span>
+        <button id="nextPage" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-200">Suiv</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const state = { page:1, size:20, total:0 };
+  const tBody = document.getElementById('tBody'), pageInfo=document.getElementById('pageInfo');
+
+  // Helper: map numeric action -> label
+  function labelForAction(x){
+    if (x?.action_label) return x.action_label;  // if API provides it
+    const m = {0:'CREATE', 1:'UPDATE', 2:'DELETE'};
+    return m[x?.action] ?? String(x?.action ?? '');
+  }
+  function badgeForAction(lbl){
+    if (lbl==='CREATE') return 'badge-success';
+    if (lbl==='UPDATE') return 'badge-warning';
+    if (lbl==='DELETE') return 'badge-error';
+    return 'badge-ghost';
+    }
+
+  function params(){
+    const p = new URLSearchParams();
+    p.set('page', state.page); p.set('page_size', state.size);
+    const val = id => (document.getElementById(id)?.value || '').trim();
+    if(val('fAction')) p.set('action', val('fAction'));               // 0/1/2 (or enum value)
+    if(val('fUser'))  p.set('actor', val('fUser'));                   // actor id
+    if(val('fCT'))    p.set('content_type', val('fCT'));              // ct id
+    if(val('fPK'))    p.set('object_pk', val('fPK'));                 // text
+    if(val('fQ'))     p.set('q', val('fQ'));                          // search repr/changes
+    if(val('fFrom'))  p.set('date_from', val('fFrom'));               // YYYY-MM-DD
+    if(val('fTo'))    p.set('date_to', val('fTo'));                   // YYYY-MM-DD
+    if(val('fIP'))    p.set('remote_addr', val('fIP'));               // IP filter
+    return p;
+  }
+
+  function row(x){
+    const lbl = labelForAction(x);
+    const badge = badgeForAction(lbl);
+    const ct = x.content_type ? `${x.content_type.app_label}.${x.content_type.model}` : (x.object_type || '—');
+    return `<tr>
+      <td class="whitespace-nowrap">${(x.timestamp||'').replace('T',' ').slice(0,19)}</td>
+      <td>${x.actor ? (x.actor.username || x.actor) : '—'}</td>
+      <td><span class="badge ${badge}">${lbl}</span></td>
+      <td>${ct} #${x.object_pk || ''}</td>
+      <td class="max-w-[35ch] truncate" title="${x.object_repr || ''}">${x.object_repr || '—'}</td>
+      <td class="font-mono text-xs">${x.remote_addr || ''}</td>
+      <td class="text-right">
+        <a href="/api/v1/audit/detail/${x.id}/" class="btn btn-xs bg-blue-100 hover:bg-blue-200 text-blue-800">Détail</a>
+      </td>
+    </tr>`;
+  }
+
+  async function load(){
+    tBody.innerHTML = `<tr><td colspan="7" class="text-center text-base-gray">Chargement…</td></tr>`;
+    // This endpoint should be your DRF list view wrapping auditlog LogEntry
+    const r = await fetch(`/api/v1/audit/logs/?${params().toString()}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!r.ok){ tBody.innerHTML = `<tr><td colspan="7" class="text-red-600 text-center">Erreur</td></tr>`; return; }
+    const data = await r.json();
+    const rows = data.results || data || [];
+    state.total = data.count || rows.length;
+    tBody.innerHTML = rows.length ? rows.map(row).join('') : `<tr><td colspan="7" class="text-center text-base-gray">Aucun log</td></tr>`;
+    pageInfo.textContent = state.total ? `Page ${state.page} — ${state.total} éléments` : `Page ${state.page}`;
+  }
+
+  // wiring
+  ['fAction','fUser','fCT','fPK','fFrom','fTo','fIP'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', ()=>{state.page=1; load();});
+  });
+  document.getElementById('fQ').addEventListener('keyup', e=>{ if(e.key==='Enter'){state.page=1; load();} });
+
+  document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>1){ state.page--; load(); }});
+  document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; load(); });
+
+  load();
+})();
+</script>
+{% endblock %}

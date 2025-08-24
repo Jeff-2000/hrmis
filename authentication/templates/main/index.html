@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRMIS - Côte d'Ivoire Civil Servant Ministry</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ci-orange': '#FF6200',
+                        'ci-green': '#009E60',
+                        'ci-white': '#FFFFFF',
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Simulated API call function
+        const apiCall = async (endpoint, method = 'GET', data = null, token = null) => {
+            try {
+                const config = {
+                    method,
+                    url: `/api${endpoint}`,
+                    headers: { Authorization: token ? `Bearer ${token}` : undefined },
+                    data,
+                };
+                const response = await axios(config);
+                return response.data;
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        };
+
+        // Main App Component
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [token, setToken] = useState(localStorage.getItem('token'));
+            const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+            useEffect(() => {
+                if (token) {
+                    // Fetch user data on mount
+                    apiCall('/auth/user/', 'GET', null, token).then(data => {
+                        setUser(data);
+                    }).catch(() => {
+                        setToken(null);
+                        localStorage.removeItem('token');
+                    });
+                }
+            }, [token]);
+
+            if (!token) {
+                return <Login setToken={setToken} />;
+            }
+
+            return (
+                <div className="flex h-screen">
+                    <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} user={user} />
+                    <div className="flex-1 flex flex-col">
+                        <Header user={user} setToken={setToken} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+                        <MainContent user={user} token={token} />
+                    </div>
+                </div>
+            );
+        };
+
+        // Login Component
+        const Login = ({ setToken }) => {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                try {
+                    const data = await apiCall('/auth/login/', 'POST', { username, password });
+                    setToken(data.token);
+                    localStorage.setItem('token', data.token);
+                } catch (err) {
+                    setError('Invalid credentials');
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-ci-white">
+                    <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md border-t-4 border-ci-orange">
+                        <h2 className="text-2xl font-bold text-center text-ci-green mb-6">HRMIS Login</h2>
+                        <form onSubmit={handleLogin}>
+                            <div className="mb-4">
+                                <label className="block text-gray-700">Username</label>
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-ci-orange"
+                                    required
+                                    aria-label="Username"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-gray-700">Password</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-ci-orange"
+                                    required
+                                    aria-label="Password"
+                                />
+                            </div>
+                            {error && <p className="text-red-500 mb-4">{error}</p>}
+                            <button
+                                type="submit"
+                                className="w-full bg-ci-orange text-white p-2 rounded hover:bg-orange-600"
+                            >
+                                Login
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Sidebar Component
+        const Sidebar = ({ isOpen, setIsOpen, user }) => {
+            const navItems = [
+                { name: 'Dashboard', path: '/', roles: ['ADMIN', 'HR', 'EMP'] },
+                { name: 'Employees', path: '/employees', roles: ['ADMIN', 'HR', 'EMP'] },
+                { name: 'Attendance', path: '/attendance', roles: ['ADMIN', 'HR', 'EMP'] },
+                { name: 'Leave Requests', path: '/leave', roles: ['ADMIN', 'HR', 'EMP'] },
+                { name: 'Payroll', path: '/payroll', roles: ['ADMIN', 'HR', 'EMP'] },
+                { name: 'Documents', path: '/documents', roles: ['ADMIN', 'HR', 'EMP'] },
+                { name: 'Administrative Situations', path: '/situations', roles: ['ADMIN', 'HR', 'EMP'] },
+                { name: 'Audit Logs', path: '/audit', roles: ['ADMIN', 'HR'] },
+                { name: 'Notifications', path: '/notifications', roles: ['ADMIN', 'HR', 'EMP'] },
+            ];
+
+            return (
+                <div className={`bg-ci-green text-white w-64 space-y-6 py-7 px-2 fixed inset-y-0 left-0 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-200 ease-in-out z-30`}>
+                    <h2 className="text-2xl font-bold text-center">HRMIS</h2>
+                    <nav>
+                        {navItems.map(item => (
+                            user?.role && item.roles.includes(user.role) && (
+                                <a
+                                    key={item.path}
+                                    href={`#${item.path}`}
+                                    className="block py-2.5 px-4 rounded hover:bg-ci-orange"
+                                    onClick={() => setIsOpen(false)}
+                                >
+                                    {item.name}
+                                </a>
+                            )
+                        ))}
+                    </nav>
+                </div>
+            );
+        };
+
+        // Header Component
+        const Header = ({ user, setToken, toggleSidebar }) => {
+            const handleLogout = () => {
+                setToken(null);
+                localStorage.removeItem('token');
+            };
+
+            return (
+                <header className="bg-ci-orange text-white p-4 flex justify-between items-center">
+                    <button className="md:hidden text-white" onClick={toggleSidebar}>
+                        ☰
+                    </button>
+                    <h1 className="text-xl font-bold">Côte d'Ivoire HRMIS</h1>
+                    <div className="flex items-center space-x-4">
+                        <span>{user?.username} ({user?.role})</span>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-ci-green px-4 py-2 rounded hover:bg-green-700"
+                        >
+                            Logout
+                        </button>
+                    </div>
+                </header>
+            );
+        };
+
+        // Main Content Component
+        const MainContent = ({ user, token }) => {
+            const [currentPath, setCurrentPath] = useState(window.location.hash.slice(1) || '/');
+
+            useEffect(() => {
+                const handleHashChange = () => setCurrentPath(window.location.hash.slice(1) || '/');
+                window.addEventListener('hashchange', handleHashChange);
+                return () => window.removeEventListener('hashchange', handleHashChange);
+            }, []);
+
+            const renderContent = () => {
+                switch (currentPath) {
+                    case '/':
+                        return <Dashboard user={user} token={token} />;
+                    case '/employees':
+                        return <EmployeeManagement user={user} token={token} />;
+                    case '/attendance':
+                        return <AttendanceManagement user={user} token={token} />;
+                    case '/leave':
+                        return <LeaveManagement user={user} token={token} />;
+                    case '/payroll':
+                        return <PayrollManagement user={user} token={token} />;
+                    case '/documents':
+                        return <DocumentManagement user={user} token={token} />;
+                    case '/situations':
+                        return <SituationManagement user={user} token={token} />;
+                    case '/audit':
+                        return <AuditLogViewer user={user} token={token} />;
+                    case '/notifications':
+                        return <NotificationViewer user={user} token={token} />;
+                    default:
+                        return <Dashboard user={user} token={token} />;
+                }
+            };
+
+            return (
+                <main className="flex-1 p-6 overflow-y-auto">
+                    {renderContent()}
+                </main>
+            );
+        };
+
+        // Dashboard Component
+        const Dashboard = ({ user, token }) => {
+            const [stats, setStats] = useState({ employees: 0, pendingLeaves: 0, notifications: 0 });
+
+            useEffect(() => {
+                const fetchStats = async () => {
+                    try {
+                        const employees = await apiCall('/employees/', 'GET', null, token);
+                        const leaves = await apiCall('/leave/', 'GET', null, token);
+                        const notifications = await apiCall('/notifications/', 'GET', null, token);
+                        setStats({
+                            employees: employees.length,
+                            pendingLeaves: leaves.filter(l => l.status === 'pending').length,
+                            notifications: notifications.length,
+                        });
+                    } catch (err) {
+                        console.error('Failed to fetch stats:', err);
+                    }
+                };
+                fetchStats();
+            }, [token]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Dashboard</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-4 rounded shadow border-l-4 border-ci-orange">
+                            <h3 className="text-lg font-semibold">Total Employees</h3>
+                            <p className="text-2xl">{stats.employees}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded shadow border-l-4 border-ci-orange">
+                            <h3 className="text-lg font-semibold">Pending Leave Requests</h3>
+                            <p className="text-2xl">{stats.pendingLeaves}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded shadow border-l-4 border-ci-orange">
+                            <h3 className="text-lg font-semibold">Notifications</h3>
+                            <p className="text-2xl">{stats.notifications}</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Employee Management Component
+        const EmployeeManagement = ({ user, token }) => {
+            const [employees, setEmployees] = useState([]);
+            const isAdminOrHR = ['ADMIN', 'HR'].includes(user?.role);
+
+            useEffect(() => {
+                const fetchEmployees = async () => {
+                    try {
+                        const endpoint = user?.role === 'EMP' ? '/employees/?user=' + user.id : '/employees/';
+                        const data = await apiCall(endpoint, 'GET', null, token);
+                        setEmployees(data);
+                    } catch (err) {
+                        console.error('Failed to fetch employees:', err);
+                    }
+                };
+                fetchEmployees();
+            }, [token, user]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Employee Management</h2>
+                    {isAdminOrHR && (
+                        <button className="bg-ci-orange text-white px-4 py-2 rounded mb-4 hover:bg-orange-600">
+                            Add Employee
+                        </button>
+                    )}
+                    <div className="bg-white rounded shadow overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-ci-green text-white">
+                                <tr>
+                                    <th className="p-2 text-left">Name</th>
+                                    <th className="p-2 text-left">Grade</th>
+                                    <th className="p-2 text-left">Department</th>
+                                    <th className="p-2 text-left">Status</th>
+                                    {isAdminOrHR && <th className="p-2 text-left">Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {employees.map(emp => (
+                                    <tr key={emp.id} className="border-b">
+                                        <td className="p-2">{emp.last_name} {emp.first_name}</td>
+                                        <td className="p-2">{emp.grade?.code || 'N/A'}</td>
+                                        <td className="p-2">{emp.department?.name || 'N/A'}</td>
+                                        <td className="p-2">{emp.status}</td>
+                                        {isAdminOrHR && (
+                                            <td className="p-2">
+                                                <button className="text-ci-orange hover:underline">Edit</button>
+                                                <button className="text-red-500 hover:underline ml-2">Delete</button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // Attendance Management Component
+        const AttendanceManagement = ({ user, token }) => {
+            const [records, setRecords] = useState([]);
+            const isAdminOrHR = ['ADMIN', 'HR'].includes(user?.role);
+
+            useEffect(() => {
+                const fetchRecords = async () => {
+                    try {
+                        const endpoint = user?.role === 'EMP' ? '/attendance/records/?employee=' + user.employee_profile : '/attendance/records/';
+                        const data = await apiCall(endpoint, 'GET', null, token);
+                        setRecords(data);
+                    } catch (err) {
+                        console.error('Failed to fetch attendance:', err);
+                    }
+                };
+                fetchRecords();
+            }, [token, user]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Attendance Management</h2>
+                    {isAdminOrHR && (
+                        <button className="bg-ci-orange text-white px-4 py-2 rounded mb-4 hover:bg-orange-600">
+                            Record Attendance
+                        </button>
+                    )}
+                    <div className="bg-white rounded shadow overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-ci-green text-white">
+                                <tr>
+                                    <th className="p-2 text-left">Employee</th>
+                                    <th className="p-2 text-left">Date</th>
+                                    <th className="p-2 text-left">Check In</th>
+                                    <th className="p-2 text-left">Check Out</th>
+                                    <th className="p-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {records.map(rec => (
+                                    <tr key={rec.id} className="border-b">
+                                        <td className="p-2">{rec.employee}</td>
+                                        <td className="p-2">{rec.date}</td>
+                                        <td className="p-2">{rec.check_in || 'N/A'}</td>
+                                        <td className="p-2">{rec.check_out || 'N/A'}</td>
+                                        <td className="p-2">{rec.status}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // Leave Management Component
+        const LeaveManagement = ({ user, token }) => {
+            const [leaves, setLeaves] = useState([]);
+            const isAdminOrHR = ['ADMIN', 'HR'].includes(user?.role);
+
+            useEffect(() => {
+                const fetchLeaves = async () => {
+                    try {
+                        const endpoint = user?.role === 'EMP' ? '/leave/?employee=' + user.employee_profile : '/leave/';
+                        const data = await apiCall(endpoint, 'GET', null, token);
+                        setLeaves(data);
+                    } catch (err) {
+                        console.error('Failed to fetch leaves:', err);
+                    }
+                };
+                fetchLeaves();
+            }, [token, user]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Leave Requests</h2>
+                    {user?.role === 'EMP' && (
+                        <button className="bg-ci-orange text-white px-4 py-2 rounded mb-4 hover:bg-orange-600">
+                            Request Leave
+                        </button>
+                    )}
+                    <div className="bg-white rounded shadow overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-ci-green text-white">
+                                <tr>
+                                    <th className="p-2 text-left">Employee</th>
+                                    <th className="p-2 text-left">Type</th>
+                                    <th className="p-2 text-left">Start Date</th>
+                                    <th className="p-2 text-left">End Date</th>
+                                    <th className="p-2 text-left">Status</th>
+                                    {isAdminOrHR && <th className="p-2 text-left">Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {leaves.map(leave => (
+                                    <tr key={leave.id} className="border-b">
+                                        <td className="p-2">{leave.employee}</td>
+                                        <td className="p-2">{leave.leave_type}</td>
+                                        <td className="p-2">{leave.start_date}</td>
+                                        <td className="p-2">{leave.end_date}</td>
+                                        <td className="p-2">{leave.status}</td>
+                                        {isAdminOrHR && (
+                                            <td className="p-2">
+                                                <button className="text-ci-orange hover:underline">Approve</button>
+                                                <button className="text-red-500 hover:underline ml-2">Reject</button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // Payroll Management Component
+        const PayrollManagement = ({ user, token }) => {
+            const [records, setRecords] = useState([]);
+            const isAdminOrHR = ['ADMIN', 'HR'].includes(user?.role);
+
+            useEffect(() => {
+                const fetchRecords = async () => {
+                    try {
+                        const endpoint = user?.role === 'EMP' ? '/payroll/?employee=' + user.employee_profile : '/payroll/';
+                        const data = await apiCall(endpoint, 'GET', null, token);
+                        setRecords(data);
+                    } catch (err) {
+                        console.error('Failed to fetch payroll:', err);
+                    }
+                };
+                fetchRecords();
+            }, [token, user]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Payroll Management</h2>
+                    {isAdminOrHR && (
+                        <button className="bg-ci-orange text-white px-4 py-2 rounded mb-4 hover:bg-orange-600">
+                            Add Payroll Record
+                        </button>
+                    )}
+                    <div className="bg-white rounded shadow overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-ci-green text-white">
+                                <tr>
+                                    <th className="p-2 text-left">Employee</th>
+                                    <th className="p-2 text-left">Period</th>
+                                    <th className="p-2 text-left">Net Salary</th>
+                                    <th className="p-2 text-left">Paid</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {records.map(rec => (
+                                    <tr key={rec.id} className="border-b">
+                                        <td className="p-2">{rec.employee}</td>
+                                        <td className="p-2">{rec.period}</td>
+                                        <td className="p-2">{rec.net_salary}</td>
+                                        <td className="p-2">{rec.paid ? 'Yes' : 'No'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // Document Management Component
+        const DocumentManagement = ({ user, token }) => {
+            const [documents, setDocuments] = useState([]);
+            const isAdminOrHR = ['ADMIN', 'HR'].includes(user?.role);
+
+            useEffect(() => {
+                const fetchDocuments = async () => {
+                    try {
+                        const endpoint = user?.role === 'EMP' ? '/documents/?employee=' + user.employee_profile : '/documents/';
+                        const data = await apiCall(endpoint, 'GET', null, token);
+                        setDocuments(data);
+                    } catch (err) {
+                        console.error('Failed to fetch documents:', err);
+                    }
+                };
+                fetchDocuments();
+            }, [token, user]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Document Management</h2>
+                    {isAdminOrHR && (
+                        <button className="bg-ci-orange text-white px-4 py-2 rounded mb-4 hover:bg-orange-600">
+                            Upload Document
+                        </button>
+                    )}
+                    <div className="bg-white rounded shadow overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-ci-green text-white">
+                                <tr>
+                                    <th className="p-2 text-left">Type</th>
+                                    <th className="p-2 text-left">Issued By</th>
+                                    <th className="p-2 text-left">Issuance Date</th>
+                                    <th className="p-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {documents.map(doc => (
+                                    <tr key={doc.id} className="border-b">
+                                        <td className="p-2">{doc.document_type}</td>
+                                        <td className="p-2">{doc.issued_by}</td>
+                                        <td className="p-2">{doc.issuance_date}</td>
+                                        <td className="p-2">{doc.status}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // Administrative Situations Component
+        const SituationManagement = ({ user, token }) => {
+            const [situations, setSituations] = useState([]);
+            const isAdminOrHR = ['ADMIN', 'HR'].includes(user?.role);
+
+            useEffect(() => {
+                const fetchSituations = async () => {
+                    try {
+                        const endpoint = user?.role === 'EMP' ? '/administrativeSituation/?employee=' + user.employee_profile : '/administrativeSituation/';
+                        const data = await apiCall(endpoint, 'GET', null, token);
+                        setSituations(data);
+                    } catch (err) {
+                        console.error('Failed to fetch situations:', err);
+                    }
+                };
+                fetchSituations();
+            }, [token, user]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Administrative Situations</h2>
+                    {isAdminOrHR && (
+                        <button className="bg-ci-orange text-white px-4 py-2 rounded mb-4 hover:bg-orange-600">
+                            Add Situation
+                        </button>
+                    )}
+                    <div className="bg-white rounded shadow overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-ci-green text-white">
+                                <tr>
+                                    <th className="p-2 text-left">Employee</th>
+                                    <th className="p-2 text-left">Type</th>
+                                    <th className="p-2 text-left">Start Date</th>
+                                    <th className="p-2 text-left">End Date</th>
+                                    <th className="p-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {situations.map(sit => (
+                                    <tr key={sit.id} className="border-b">
+                                        <td className="p-2">{sit.employee}</td>
+                                        <td className="p-2">{sit.situation_type}</td>
+                                        <td className="p-2">{sit.start_date}</td>
+                                        <td className="p-2">{sit.end_date || 'N/A'}</td>
+                                        <td className="p-2">{sit.status}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // Audit Log Viewer Component
+        const AuditLogViewer = ({ user, token }) => {
+            const [logs, setLogs] = useState([]);
+
+            useEffect(() => {
+                const fetchLogs = async () => {
+                    try {
+                        const data = await apiCall('/audit/', 'GET', null, token);
+                        setLogs(data);
+                    } catch (err) {
+                        console.error('Failed to fetch audit logs:', err);
+                    }
+                };
+                fetchLogs();
+            }, [token]);
+
+            if (!['ADMIN', 'HR'].includes(user?.role)) {
+                return <div className="text-red-500">Access Denied</div>;
+            }
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Audit Logs</h2>
+                    <div className="bg-white rounded shadow overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-ci-green text-white">
+                                <tr>
+                                    <th className="p-2 text-left">Timestamp</th>
+                                    <th className="p-2 text-left">User</th>
+                                    <th className="p-2 text-left">Action</th>
+                                    <th className="p-2 text-left">Object Type</th>
+                                    <th className="p-2 text-left">Object ID</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {logs.map(log => (
+                                    <tr key={log.id} className="border-b">
+                                        <td className="p-2">{log.timestamp}</td>
+                                        <td className="p-2">{log.user}</td>
+                                        <td className="p-2">{log.action}</td>
+                                        <td className="p-2">{log.object_type}</td>
+                                        <td className="p-2">{log.object_id}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // Notification Viewer Component
+        const NotificationViewer = ({ user, token }) => {
+            const [notifications, setNotifications] = useState([]);
+
+            useEffect(() => {
+                const fetchNotifications = async () => {
+                    try {
+                        const data = await apiCall('/notifications/', 'GET', null, token);
+                        setNotifications(data);
+                    } catch (err) {
+                        console.error('Failed to fetch notifications:', err);
+                    }
+                };
+                fetchNotifications();
+            }, [token]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 text-ci-green">Notifications</h2>
+                    <div className="space-y-4">
+                        {notifications.map(notif => (
+                            <div key={notif.id} className="bg-white p-4 rounded shadow border-l-4 border-ci-orange">
+                                <p><strong>Channel:</strong> {notif.channel}</p>
+                                <p><strong>Recipient:</strong> {notif.recipient}</p>
+                                <p><strong>Message:</strong> {notif.message}</p>
+                                <p><strong>Status:</strong> {notif.status}</p>
+                                <p><strong>Timestamp:</strong> {notif.timestamp}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the App
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

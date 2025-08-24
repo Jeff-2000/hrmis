@@ -1,0 +1,382 @@
+{% load static tailwind_tags %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HRMIS - République de Côte d'Ivoire{% endblock %}</title>
+    <link rel="icon" href="{% static 'images/favicon.ico' %}"> 
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    {% tailwind_css %}
+
+    <style>
+        body.flag-bg {
+            background-size: 300% 100%;
+            animation: flag-animation 15s ease-in-out infinite;
+            background-image: linear-gradient(to right, 
+                #F77F00 0%, #F77F00 33.3%,
+                #FFFFFF 33.3%, #FFFFFF 66.6%,
+                #009739 66.6%, #009739 100%
+            );
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes flag-animation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .input-wrapper {
+            transition: all 0.2s ease-out;
+            border-radius: var(--rounded-btn, 0.5rem);
+        }
+        .input-wrapper.focused {
+            transform: scale(1.01);
+            box-shadow: 0 0 0 3px rgba(247, 127, 0, 0.3);
+        }
+        .input:focus {
+            outline: none;
+        }
+        .login-container {
+            max-width: 28rem;
+            width: 100%;
+            max-height: 95vh;
+            overflow-y: auto;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        .login-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .login-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        .login-container::-webkit-scrollbar-thumb {
+            background: rgba(247, 127, 0, 0.5);
+            border-radius: 10px;
+        }
+        .login-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(247, 127, 0, 0.7);
+        }
+
+        .modal-box {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body class="font-sans leading-normal tracking-normal flag-bg">
+    <div class="login-container space-y-8 p-4 bg-white bg-opacity-90 rounded-xl shadow-2xl backdrop-blur-sm relative z-10">
+        <div class="text-center">
+            <div class="mx-auto h-24 w-24 bg-green-600 rounded-full flex items-center justify-center shadow-xl mb-6 transform hover:scale-105 transition-transform duration-300 ease-in-out">
+                <span class="text-white text-4xl font-bold tracking-tight">CI</span>
+            </div>
+            <h2 class="text-4xl font-extrabold text-gray-800 mb-2 animate-fade-in-up">
+                Connexion à <span class="text-orange-600">HRMIS</span>
+            </h2>
+            <p class="text-gray-600 text-base animate-fade-in">
+                Système de Gestion des Ressources Humaines de la République de Côte d'Ivoire
+            </p>
+        </div>
+
+        <div class="card bg-white shadow-2xl border border-gray-100 overflow-hidden rounded-xl">
+            <div class="bg-gradient-to-r from-orange-600 to-green-600 p-6 text-center shadow-md">
+                <h3 class="text-xl font-semibold text-white flex items-center justify-center gap-2">
+                    <i class="fas fa-shield-alt"></i>
+                    Accès Sécurisé
+                </h3>
+            </div>
+
+            <div class="card-body p-8 border-t-4 border-white">
+                <div id="errorContainer"></div>
+                <form method="post" id="loginForm" class="space-y-6" action="{% url 'login' %}">
+                    {% csrf_token %}
+                    <div class="form-control">
+                        <label class="label" for="username">
+                            <span class="label-text font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-user text-orange-600"></i>
+                                Nom d'utilisateur
+                            </span>
+                        </label>
+                        <div class="relative input-wrapper">
+                            <input 
+                                type="text" 
+                                id="username" 
+                                name="username" 
+                                value="{{ username|default:'' }}"
+                                class="input input-bordered w-full pl-12 bg-gray-50 border-gray-300 focus:border-orange-600 focus:bg-white transition-all duration-200 text-gray-800 placeholder-gray-400" 
+                                placeholder="Entrez votre nom d'utilisateur"
+                                required
+                                autocomplete="username"
+                            >
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div> 
+
+                    <div class="form-control">
+                        <label class="label" for="password">
+                            <span class="label-text font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-lock text-orange-600"></i>
+                                Mot de passe
+                            </span>
+                        </label>
+                        <div class="relative input-wrapper">
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                class="input input-bordered w-full pl-12 pr-12 bg-gray-50 border-gray-300 focus:border-orange-600 focus:bg-white transition-all duration-200 text-gray-800 placeholder-gray-400" 
+                                placeholder="Entrez votre mot de passe"
+                                required
+                                autocomplete="current-password"
+                            >
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <button 
+                                type="button" 
+                                id="togglePassword" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-orange-600 transition-colors duration-200"
+                                aria-label="Afficher ou masquer le mot de passe"
+                            >
+                                <i class="fas fa-eye" id="eyeIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between text-sm">
+                        <label class="label cursor-pointer flex items-center gap-2">
+                            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary border-gray-300 checked:bg-green-600" id="remember">
+                            <span class="label-text text-gray-600 select-none">Se souvenir de moi</span>
+                        </label>
+                        <a href="#" class="text-orange-600 hover:text-green-600 font-medium transition-colors duration-200">
+                            Mot de passe oublié ?
+                        </a>
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        id="loginBtn"
+                        class="btn w-full bg-gradient-to-r from-orange-600 to-green-600 hover:from-green-600 hover:to-orange-600 text-white font-semibold text-lg py-3 border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.01]"
+                    >
+                        <span id="loginBtnText" class="flex items-center justify-center">
+                            <i class="fas fa-sign-in-alt mr-2"></i>
+                            Se connecter
+                        </span>
+                        <span id="loginBtnLoading" class="hidden flex items-center justify-center">
+                            <span class="loading loading-spinner loading-sm mr-2"></span>
+                            Connexion en cours...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center pb-4 sm:pb-0">
+            <div class="flex items-center justify-center gap-4 text-sm text-gray-500 mb-4">
+                <div class="flex items-center gap-1">
+                    <i class="fas fa-shield-alt text-green-600"></i>
+                    <span>Connexion sécurisée</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <i class="fas fa-clock text-orange-600"></i>
+                    <span>Disponible 24/7</span>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400">
+                © 2025 République de Côte d'Ivoire - Tous droits réservés
+            </p>
+        </div>
+    </div>
+
+    <dialog id="verifyingModal" class="modal">
+        <div class="modal-box text-center p-8 bg-white rounded-lg shadow-xl">
+            <div class="mb-4">
+                <div class="mx-auto w-20 h-20 bg-orange-600 rounded-full flex items-center justify-center mb-4 transform scale-90 animate-pop-in">
+                    <i class="fas fa-spinner fa-spin text-white text-3xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-orange-600 animate-fade-in-up">Vérification en cours</h3>
+                <p class="text-gray-600 mt-2 animate-fade-in">Vérification des identifiants, veuillez patienter...</p>
+            </div>
+            <div class="flex justify-center mt-6">
+                <span class="loading loading-dots loading-lg text-orange-600"></span>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="successModal" class="modal">
+        <div class="modal-box text-center p-8 bg-white rounded-lg shadow-xl">
+            <div class="mb-4">
+                <div class="mx-auto w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mb-4 transform scale-90 animate-pop-in">
+                    <i class="fas fa-check text-white text-3xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-green-600 animate-fade-in-up">Connexion réussie !</h3>
+                <p class="text-gray-600 mt-2 animate-fade-in">Redirection en cours...</p>
+            </div>
+            <div class="flex justify-center mt-6">
+                <span class="loading loading-dots loading-lg text-green-600"></span>
+            </div>
+        </div>
+    </dialog>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('loginForm');
+            const loginBtn = document.getElementById('loginBtn');
+            const loginBtnText = document.getElementById('loginBtnText');
+            const loginBtnLoading = document.getElementById('loginBtnLoading');
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            const verifyingModal = document.getElementById('verifyingModal');
+            const successModal = document.getElementById('successModal');
+            const usernameInput = document.getElementById('username');
+            const errorContainer = document.getElementById('errorContainer');
+            let isSubmitting = false; // Prevent multiple submissions
+
+            // Password Toggle Functionality
+            togglePassword.addEventListener('click', function() {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                eyeIcon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+                passwordInput.focus();
+            });
+
+            // Form Validation
+            function validateForm() {
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                if (!username) {
+                    alert('Veuillez entrer votre nom d\'utilisateur.');
+                    usernameInput.focus();
+                    return false;
+                }
+                if (!password) {
+                    alert('Veuillez entrer votre mot de passe.');
+                    passwordInput.focus();
+                    return false;
+                }
+                return true;
+            }
+
+            // Loading State Management
+            function setLoadingState(loading) {
+                loginBtn.disabled = loading;
+                loginBtnText.classList.toggle('hidden', loading);
+                loginBtnLoading.classList.toggle('hidden', !loading);
+                loginBtn.classList.toggle('opacity-80', loading);
+                if (loading) {
+                    loginBtn.classList.add('cursor-not-allowed');
+                } else {
+                    loginBtn.classList.remove('cursor-not-allowed');
+                }
+            }
+
+            // Input Field Focus Animations
+            const inputWrappers = document.querySelectorAll('.input-wrapper');
+            inputWrappers.forEach(wrapper => {
+                const input = wrapper.querySelector('input');
+                input.addEventListener('focus', () => wrapper.classList.add('focused'));
+                input.addEventListener('blur', () => wrapper.classList.remove('focused'));
+            });
+
+            // Get CSRF token from form
+            function getCsrfToken() {
+                return document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+            }
+
+            // Form Submission Logic
+            loginForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                if (isSubmitting || !validateForm()) {
+                    return;
+                }
+                isSubmitting = true;
+                setLoadingState(true);
+                verifyingModal.showModal();
+
+                const formData = new FormData(loginForm);
+                try {
+                    const response = await fetch('{% url 'login' %}', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest' // Indicate AJAX request
+                        },
+                        credentials: 'same-origin'
+                    });
+
+                    verifyingModal.close();
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            successModal.showModal();
+                            setTimeout(() => {
+                                window.location.href = '{% url 'employee_list' %}';
+                            }, 1500); // Delay to show success modal
+                        } else {
+                            errorContainer.innerHTML = `
+                                <div class="alert alert-error bg-orange-100 text-orange-800 border-l-4 border-orange-600 p-4 mb-6 rounded-md">
+                                    <i class="fas fa-exclamation-circle text-orange-600 mr-3"></i>
+                                    <span>${data.error || 'Erreur lors de la connexion. Veuillez réessayer.'}</span>
+                                </div>
+                            `;
+                            setLoadingState(false);
+                            isSubmitting = false;
+                        }
+                    } else {
+                        let errorMsg = `Erreur serveur (${response.status}). Veuillez réessayer.`;
+                        if (response.status === 401) {
+                            errorMsg = "Nom d'utilisateur ou Mot de Passe Incorrect";
+                        }
+                        errorContainer.innerHTML = `
+                            <div class="alert alert-error bg-orange-100 text-orange-800 border-l-4 border-orange-600 p-4 mb-6 rounded-md">
+                                <i class="fas fa-exclamation-circle text-orange-600 mr-3"></i>
+                                <span>${errorMsg}</span>
+                            </div>
+                        `;
+                        setLoadingState(false);
+                        isSubmitting = false;
+                    }
+                } catch (error) {
+                    verifyingModal.close();
+                    errorContainer.innerHTML = `
+                        <div class="alert alert-error bg-orange-100 text-orange-800 border-l-4 border-orange-600 p-4 mb-6 rounded-md">
+                            <i class="fas fa-exclamation-circle text-orange-600 mr-3"></i>
+                            <span>Une erreur réseau est survenue. Veuillez réessayer.</span>
+                        </div>
+                    `;
+                    setLoadingState(false);
+                    isSubmitting = false;
+                }
+            });
+
+            // Auto-focus username field
+            usernameInput.focus();
+
+            // Display server-side error if present
+            {% if error %}
+                errorContainer.innerHTML = `
+                    <div class="alert alert-error bg-orange-100 text-orange-800 border-l-4 border-orange-600 p-4 mb-6 rounded-md">
+                        <i class="fas fa-exclamation-circle text-orange-600 mr-3"></i>
+                        <span>{{ error }}</span>
+                    </div>
+                `;
+            {% endif %}
+        });
+    </script>
+</body>
+</html>

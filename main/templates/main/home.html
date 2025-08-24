@@ -1,0 +1,24 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - HRMIS{% endblock %}
+
+{% block content %}
+<div>
+    <h2 class="text-2xl font-bold mb-4 text-ci-green">Dashboard</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white p-4 rounded shadow border-l-4 border-ci-orange">
+            <h3 class="text-lg font-semibold">Total Employees</h3>
+            <p class="text-2xl">{{ stats.employees }}</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow border-l-4 border-ci-orange">
+            <h3 class="text-lg font-semibold">Pending Leave Requests</h3>
+            <p class="text-2xl">{{ stats.pending_leaves }}</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow border-l-4 border-ci-orange">
+            <h3 class="text-lg font-semibold">Notifications</h3>
+            <p class="text-2xl">{{ stats.notifications }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

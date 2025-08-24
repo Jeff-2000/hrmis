@@ -1,0 +1,130 @@
+{% extends 'main/base.html' %}
+{% block title %}Paramètres Paie — Composants{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+  <div class="card bg-white shadow-xl border-l-4 border-orange-600">
+    <div class="card-body">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-orange-600 flex items-center gap-2"><i class="fas fa-puzzle-piece"></i> Composants de Paie</h1>
+        <button id="btnNew" class="btn bg-orange-600 hover:bg-orange-700 text-white"><i class="fas fa-plus mr-2"></i>Nouveau</button>
+      </div>
+
+      <div class="overflow-x-auto mt-4">
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap text-blue-600">Code</th>
+              <th class="whitespace-nowrap text-blue-600">Nom</th>
+              <th class="whitespace-nowrap text-blue-600">Type</th>
+              <th class="whitespace-nowrap text-blue-600">Taxable</th>
+              <th class="whitespace-nowrap text-blue-600">Contributif</th>
+              <th class="whitespace-nowrap text-blue-600">%</th>
+              <th class="whitespace-nowrap text-blue-600">Ordre</th>
+              <th class="whitespace-nowrap text-blue-600 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"><tr><td colspan="8" class="text-center text-base-gray">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="checkbox" id="editModal" class="modal-toggle" />
+<div class="modal">
+  <div class="modal-box bg-white border-l-4 border-orange-600">
+    <h3 class="font-bold text-lg" id="modalTitle">Nouveau Composant</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div><label class="label"><span class="label-text">Code</span></label><input id="f_code" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+      <div><label class="label"><span class="label-text">Nom</span></label><input id="f_name" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800"></div>
+      <div>
+        <label class="label"><span class="label-text">Type</span></label>
+        <select id="f_kind" class="select select-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+          <option value="EARNING">Earning</option>
+          <option value="DEDUCTION">Deduction</option>
+          <option value="EMPLOYER">Employer Charge</option>
+        </select>
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Pourcentage (optionnel)</span></label>
+        <input id="f_pct" type="number" step="0.0001" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800">
+      </div>
+      <div>
+        <label class="label"><span class="label-text">Ordre</span></label>
+        <input id="f_seq" type="number" class="input input-bordered w-full border-blue-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 bg-white text-blue-800" value="100">
+      </div>
+      <div class="flex gap-4 items-center">
+        <label class="cursor-pointer flex items-center gap-2"><input id="f_taxable" type="checkbox" class="checkbox checkbox-primary" checked><span>Taxable</span></label>
+        <label class="cursor-pointer flex items-center gap-2"><input id="f_contrib" type="checkbox" class="checkbox checkbox-primary" checked><span>Contributif</span></label>
+      </div>
+    </div>
+    <div class="modal-action">
+      <label for="editModal" class="btn btn-ghost">Annuler</label>
+      <button id="btnSave" class="btn bg-orange-600 hover:bg-orange-700 text-white">Enregistrer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  function getCsrf(){ const m=document.cookie.match(/csrftoken=([^;]+)/); return m?m[1]:''; }
+  let editId=null;
+  async function load(){
+    const tbody=document.getElementById('tbody'); tbody.innerHTML=`<tr><td colspan="8" class="text-center text-base-gray">Chargement…</td></tr>`;
+    const r=await fetch('/api/v1/components/?page_size=999'); const d=await r.json(); const rows=d.results||d||[];
+    if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8" class="text-center text-base-content/60">Aucun</td></tr>`; return; }
+    tbody.innerHTML = rows.map(x=>`<tr>
+      <td>${x.code}</td><td>${x.name}</td><td>${x.kind}</td>
+      <td>${x.taxable?'Oui':'Non'}</td><td>${x.contributory?'Oui':'Non'}</td>
+      <td>${x.percentage||''}</td><td>${x.sequence}</td>
+      <td class="text-right">
+        <button class="btn btn-xs" data-edit="${x.id}"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-xs btn-error text-white" data-del="${x.id}"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+    tbody.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.edit)));
+    tbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>doDelete(b.dataset.del)));
+  }
+  async function openEdit(id){
+    editId=id||null;
+    document.getElementById('modalTitle').textContent = id?'Modifier Composant':'Nouveau Composant';
+    ['f_code','f_name','f_pct','f_seq'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('f_kind').value='EARNING';
+    document.getElementById('f_taxable').checked=true; document.getElementById('f_contrib').checked=true;
+    if(id){
+      const x=await fetch('/api/v1/components/'+id+'/').then(r=>r.json());
+      f_code.value=x.code; f_name.value=x.name; f_kind.value=x.kind;
+      f_pct.value=x.percentage || ''; f_seq.value=x.sequence||100;
+      f_taxable.checked=!!x.taxable; f_contrib.checked=!!x.contributory;
+    }
+    document.getElementById('editModal').checked=true;
+  }
+  async function doSave(){
+    const payload={
+      code:f_code.value.trim(), name:f_name.value.trim(), kind:f_kind.value,
+      taxable:f_taxable.checked, contributory:f_contrib.checked,
+      percentage: f_pct.value? Number(f_pct.value): null,
+      sequence: Number(f_seq.value||100)
+    };
+    if(!payload.code || !payload.name){ showToast('Code et nom requis','error'); return; }
+    const url = editId? `/api/v1/components/${editId}/`:'/api/v1/components/';
+    const method = editId? 'PUT':'POST';
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},body:JSON.stringify(payload)});
+    if(!r.ok){ const e=await r.json().catch(()=>({detail:'Erreur'})); showToast(e.detail||JSON.stringify(e),'error'); return; }
+    editModal.checked=false; showToast('Enregistré','success'); load();
+  }
+  async function doDelete(id){
+    if(!confirm('Supprimer ce composant ?')) return;
+    const r=await fetch(`/api/v1/components/${id}/`,{method:'DELETE',headers:{'X-CSRFToken':getCsrf()}});
+    if(!r.ok){ showToast('Suppression impossible','error'); return; }
+    showToast('Supprimé','success'); load();
+  }
+  btnNew.addEventListener('click',()=>openEdit(null));
+  btnSave.addEventListener('click',doSave);
+  load();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,458 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-building text-blue-600"></i> Gestion des Départements
+    </h1>
+    
+    <div class="dashboard-grid grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-blue-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-blue-500 text-white rounded-full p-3">
+                    <i class="fas fa-building"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Départements</h3>
+                    <div class="stat-number text-2xl font-bold text-blue-600" id="totalDepartments">0</div>
+                    <div class="stat-label text-gray-600">Unités organisationnelles</div>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-green-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-green-500 text-white rounded-full p-3">
+                    <i class="fas fa-user-tie"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Employés</h3>
+                    <div class="stat-number text-2xl font-bold text-green-600" id="totalEmployees">0</div>
+                    <div class="stat-label text-gray-600">Répartis par département</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="search-bar mb-6 flex items-center gap-2">
+        <i class="fas fa-search text-gray-600"></i>
+        <input type="text" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" id="departmentSearch" placeholder="Rechercher un département..." onkeyup="searchDepartments()">
+    </div>
+    
+    <div class="table-container bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+        <div class="table-header flex justify-between items-center p-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list mr-2"></i> Liste des Départements</h3>
+            <a href="{% url 'department_create' %}" class="btn bg-green-500 hover:bg-green-600 text-white">
+                <i class="fas fa-plus mr-2"></i> Ajouter
+            </a>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-3 px-4 text-left text-gray-800">Nom</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Ministère: Département Parent</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Nombre d'Employés</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="departmentsTable"></tbody>
+        </table>
+        <div id="pagination" class="flex justify-between items-center p-4">
+            <div>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" onclick="changePage(-1)" disabled>Précédent</button>
+                <span id="pageInfo" class="text-gray-600"></span>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage" onclick="changePage(1)">Suivant</button>
+            </div>
+            <select id="pageSize" onchange="updatePageSize()" class="select select-bordered border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPage = 1;
+    let pageSize = 10;
+    let searchQuery = '';
+
+    // Toast notification
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1">
+                <p class="text-sm font-medium">${message}</p>
+            </div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    // Custom ShowMessage for dialogs
+    function ShowMessage({ title, message, type = 'info', buttons = [], onClose = null }) {
+        const modal = document.createElement('dialog');
+        modal.className = 'modal';
+        const colors = {
+            info: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-600', icon: 'fa-info-circle text-blue-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' },
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            confirm: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-600', icon: 'fa-question-circle text-yellow-600' }
+        };
+        const { bg, text, border, icon } = colors[type] || colors.info;
+        modal.innerHTML = `
+            <div class="modal-box ${bg} ${text} border-l-4 ${border} p-6">
+                <div class="flex items-start">
+                    <i class="fas ${icon} mt-1 mr-3 text-2xl"></i>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold mb-2">${title}</h2>
+                        <p class="text-sm">${message}</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    ${buttons.map(btn => `
+                        <button class="btn ${btn.className || 'btn-ghost text-gray-600 hover:bg-gray-200'}" onclick="${btn.onclick}">
+                            ${btn.label}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.showModal();
+        modal.addEventListener('close', () => {
+            modal.remove();
+            if (onClose) onClose();
+        });
+        return modal;
+    }
+
+    function closeModal() {
+        const modal = document.querySelector('.modal');
+        if (modal) modal.close();
+    }
+
+    // Get CSRF token from cookie
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function searchDepartments() {
+        searchQuery = document.getElementById('departmentSearch').value;
+        currentPage = 1;
+        loadDepartments();
+    }
+
+    function updatePageSize() {
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadDepartments();
+    }
+
+    function changePage(delta) {
+        currentPage += delta;
+        loadDepartments();
+    }
+
+    async function loadDepartments() {
+        try {
+            const url = `/api/v1/employees/departments/?page=${currentPage}&page_size=${pageSize}&search=${encodeURIComponent(searchQuery)}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const nonJsonText = await response.text();
+                throw new Error(`Format de réponse invalide: JSON attendu, reçu ${contentType}. Réponse: ${nonJsonText}`);
+            }
+
+            const data = await response.json();
+            const tbody = document.getElementById('departmentsTable');
+            tbody.innerHTML = data.results.map(department => `
+                <tr class="hover:bg-blue-50 border-b border-gray-200">
+                    <td class="py-3 px-4"><span class="badge bg-blue-500 text-white">${department.name}</span></td>
+                    <td class="py-3 px-4">${department.parent ? department.parent.name : 'Aucun'}</td>
+                    <td class="py-3 px-4">${department.employee_count || 0}</td>
+                    <td class="py-3 px-4">
+                        <div class="flex gap-2">
+                            <button class="btn btn-sm btn-ghost text-blue-600 hover:bg-blue-100" onclick="viewDepartment('${department.id}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                            <button class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white" onclick="editDepartment('${department.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm bg-red-500 hover:bg-red-600 text-white" onclick="confirmDelete('${department.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" class="py-3 px-4 text-center text-gray-500">Aucun département trouvé.</td></tr>';
+
+            document.getElementById('totalDepartments').textContent = data.count;
+            document.getElementById('totalEmployees').textContent = data.total_employees || 0;
+
+            const totalPages = Math.ceil(data.count / pageSize);
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage === totalPages;
+        } catch (error) {
+            console.error('Error loading departments:', error);
+            showToast(`Erreur lors du chargement des départements: ${error.message}`, 'error');
+        }
+    }
+
+    async function viewDepartment(id) {
+        try {
+            const response = await fetch(`/api/v1/employees/departments/view/${id}/`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                const responseText = await response.text();
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                throw new Error(`Erreur API (${response.status}): ${responseText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const responseText = await response.text();
+                throw new Error(`Format de réponse invalide: JSON attendu, reçu ${contentType}. Réponse: ${responseText}`);
+            }
+            const department = await response.json();
+            ShowMessage({
+                title: 'Détails du Département',
+                message: `
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800"><span class="badge bg-blue-500 text-white">${department.name}</span></h3>
+                        <p><strong>Département Parent:</strong> ${department.parent ? department.parent.name : 'Aucun'}</p>
+                        <p><strong>Nombre d'Employés:</strong> ${department.employee_count || 0}</p>
+                    </div>
+                `,
+                type: 'info',
+                buttons: [
+                    {% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+                    { label: 'Modifier', className: 'bg-blue-500 hover:bg-blue-600 text-white', onclick: `closeModal();editDepartment('${department.id}')` },
+                    { label: 'Supprimer', className: 'bg-red-500 hover:bg-red-600 text-white', onclick: `closeModal();confirmDelete('${department.id}')` },
+                    {% endif %}
+                    { label: 'Fermer', className: 'btn-ghost text-gray-600 hover:bg-gray-100', onclick: 'closeModal()' }
+                ]
+            });
+        } catch (error) {
+            console.error('Error viewing department:', error);
+            showToast(`Erreur lors du chargement des détails: ${error.message}`, 'error');
+        }
+    }
+
+    async function editDepartment(id) {
+        try {
+            // Fetch current department data
+            const deptResponse = await fetch(`/api/v1/employees/departments/view/${id}/`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+
+            if (!deptResponse.ok) throw new Error(await deptResponse.text());
+            const department = await deptResponse.json();
+
+            // Fetch department choices for parent
+            const choicesResponse = await fetch(`/api/v1/employees/departments/choices/`, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!choicesResponse.ok) throw new Error(await choicesResponse.text());
+            const departments = await choicesResponse.json();
+
+            // Build dropdown options (don't allow parent to be itself)
+            const parentOptions = departments
+                .filter(dep => dep.id !== department.id)
+                .map(dep => 
+                    `<option value="${dep.id}" ${department.parent && department.parent.id === dep.id ? 'selected' : ''}>${dep.name}</option>`
+                )
+                .join('');
+            
+            ShowMessage({
+                title: 'Modifier le Département',
+                message: `
+                    <form id="editDepartmentForm" class="grid grid-cols-1 gap-4">
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Nom du Département</span></label>
+                            <input type="text" name="name" value="${department.name}" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Ministère: Département Parent</span></label>
+                            <select name="parent" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                                <option value="">Aucun</option>
+                                ${parentOptions}
+                            </select>
+                        </div>
+                    </form>
+                `,
+                type: 'info',
+                buttons: [
+                    { label: 'Enregistrer', className: 'bg-green-500 hover:bg-green-600 text-white', onclick: `submitEditDepartment('${department.id}')` },
+                    { label: 'Annuler', className: 'btn-ghost text-gray-600 hover:bg-gray-100', onclick: 'closeModal()' }
+                ]
+            });
+        } catch (error) {
+            console.error('Error loading department for edit:', error);
+            showToast(`Erreur lors du chargement du département: ${error.message}`, 'error');
+        }
+    }
+
+    async function submitEditDepartment(id) {
+        const form = document.getElementById('editDepartmentForm');
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => {
+            // If parent is empty, send null
+            data[key] = key === 'parent' && !value ? null : value;
+        });
+
+        try {
+            const response = await fetch(`/api/v1/employees/departments/edit/${id}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                const errorText = await response.text();
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                if (response.status === 403) {
+                    showToast('Permission refusée', 'error');
+                    return;
+                }
+                throw new Error(`Erreur API (${response.status}): ${errorText}`);
+            }
+            if (!contentType || !contentType.includes('application/json')) {
+                const nonJsonText = await response.text();
+                throw new Error(`Format de réponse invalide: JSON attendu, reçu ${contentType}. Réponse: ${nonJsonText}`);
+            }
+            closeModal();
+            showToast('Département mis à jour avec succès!', 'success');
+            loadDepartments();
+        } catch (error) {
+            console.error('Error updating department:', error);
+            showToast(`Erreur lors de la mise à jour du département: ${error.message}`, 'error');
+        }
+    }
+
+    async function confirmDelete(id) {
+        ShowMessage({
+            title: 'Confirmer la Suppression',
+            message: 'Êtes-vous sûr de vouloir supprimer ce département ? Cette action est irréversible.',
+            type: 'confirm',
+            buttons: [
+                { label: 'Supprimer', className: 'bg-red-500 hover:bg-red-600 text-white', onclick: `deleteDepartment('${id}')` },
+                { label: 'Annuler', className: 'btn-ghost text-gray-600 hover:bg-gray-100', onclick: 'closeModal()' }
+            ]
+        });
+    }
+
+    async function deleteDepartment(id) {
+        try {
+            const response = await fetch(`/api/v1/employees/departments/delete/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            const text = await response.text();
+            if (!response.ok) {
+                let errorData;
+                try {
+                    errorData = JSON.parse(text);
+                } catch {
+                    errorData = { error: text };
+                }
+                if (response.status === 401) {
+                    showToast('Veuillez vous connecter à nouveau', 'error');
+                    setTimeout(() => window.location.href = '{% url 'login' %}', 2000);
+                    return;
+                }
+                if (response.status === 403) {
+                    showToast('Permission refusée', 'error');
+                    return;
+                }
+                // Show error and list of employees if present
+                let message = errorData.error || "Erreur lors de la suppression du département.";
+                if (errorData.employees && errorData.employees.length) {
+                    message += "<br>Employés concernés :<ul style='margin:0'>";
+                    errorData.employees.forEach(emp => {
+                        message += `<li>${emp.last_name} ${emp.first_name}</li>`;
+                    });
+                    message += "</ul>";
+                }
+                showToast(message, 'error');
+                return;
+            }
+            closeModal();
+            showToast('Département supprimé avec succès!', 'success');
+            loadDepartments();
+        } catch (error) {
+            console.error('Error deleting department:', error);
+            showToast(`Erreur lors de la suppression du département: ${error.message}`, 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDepartments);
+</script>
+{% endblock %}

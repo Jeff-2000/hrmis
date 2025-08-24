@@ -1,0 +1,61 @@
+{# templates/accounts/help.html #}
+{% extends 'main/base.html' %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-10 space-y-6">
+  <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-8 rounded-2xl shadow">
+    <h1 class="text-3xl font-bold">Centre d’aide HRMIS</h1>
+    <p class="opacity-90 mt-2">Guides rapides, raccourcis, FAQ et assistance.</p>
+  </div>
+
+  <!-- Search (client-side filter) -->
+  <div class="bg-white rounded-xl shadow p-6">
+    <input id="q" class="input input-bordered w-full bg-blue-50" placeholder="Rechercher (ex: congé, paie, contrat)">
+  </div>
+
+  <div id="helpList" class="space-y-3">
+    <!-- filled by JS -->
+  </div>
+
+  <div class="bg-white rounded-xl shadow p-6">
+    <h3 class="text-lg font-semibold mb-2">Besoin d’aide supplémentaire ?</h3>
+    <p class="text-gray-600 mb-3">Écrivez-nous: <a class="text-blue-600 hover:underline" href="mailto:support@votre-domaine.ci">support@votre-domaine.ci</a></p>
+    <p class="text-gray-600">Version: <span id="vinfo">—</span></p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const topics = [
+    { t: "Soumettre une demande de congé", k:["congé","leave"], c:"Allez à *Mes congés* → *Nouvelle demande*. Choisissez le type, les dates et joignez un document si requis, puis validez." },
+    { t: "Approuver une demande (Manager)", k:["manager","approve"], c:"Menu *Gestion des congés*. Filtrez *En attente*. Sélectionnez une demande → *Approuver*." },
+    { t: "Consulter mon bulletin de paie", k:["paie","payslip"], c:"Page *Profil* → section *Mes bulletins*. Vous pouvez télécharger le PDF." },
+    { t: "Mettre à jour mes préférences de notification", k:["notification","sms","whatsapp","email"], c:"Page *Paramètres → Notifications*. Choisissez le canal, contact et activez." },
+    { t: "Changer le thème / langue", k:["thème","langue","paramètres"], c:"Page *Paramètres*. Sélectionnez *Thème* et *Langue*, puis enregistrez." },
+    { t: "Aide analytique", k:["analytics","tableau de bord"], c:"*Analytics → Dashboard* pour KPI, prévisions et risques d’attrition." },
+  ];
+
+  const list = document.getElementById('helpList');
+  const q = document.getElementById('q');
+
+  function render(filter="") {
+    const qv = filter.trim().toLowerCase();
+    const data = topics.filter(x => !qv || x.t.toLowerCase().includes(qv) || x.k.some(k => k.includes(qv)));
+    list.innerHTML = data.map(x => `
+      <details class="bg-white rounded-lg shadow p-4">
+        <summary class="cursor-pointer font-medium">${x.t}</summary>
+        <div class="text-gray-700 mt-2 whitespace-pre-wrap">${x.c}</div>
+      </details>
+    `).join('') || '<div class="text-gray-500">Aucun résultat.</div>';
+  }
+
+  async function versionInfo() {
+    // If you have an endpoint, plug here; else keep static
+    document.getElementById('vinfo').textContent = "1.0.0";
+  }
+
+  q.addEventListener('input', () => render(q.value));
+  document.addEventListener('DOMContentLoaded', () => { render(); versionInfo(); });
+})();
+</script>
+{% endblock %}
+

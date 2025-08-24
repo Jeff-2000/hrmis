@@ -1,0 +1,688 @@
+{% extends 'main/base.html' %}
+
+{% comment %} {% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet" />
+<style>
+  .fc-event { cursor: pointer; border-radius: 6px; }
+  .pill { font-size: 11px; line-height: 1; padding: 2px 6px; border-radius: 9999px; border: 1px solid rgba(0,0,0,.08); }
+  .pill-warn { background: #fef9c3; }
+  .pill-ok { background: #dcfce7; }
+  .pill-stop { background: #fee2e2; }
+  .pill-muted { background: #f1f5f9; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
+  .legend-pending { background: #f59e0b; }
+  .legend-active { background: #10b981; }
+  .legend-done { background: #ef4444; }
+  .toolbar-chip { padding: 4px 10px; border-radius: 9999px; border: 1px solid #cbd5e1; font-size: 12px; cursor: pointer; }
+  .toolbar-chip.active { background: #0ea5e9; color: white; border-color: #0ea5e9; }
+  .table thead th { white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-4">
+    <i class="fas fa-history text-blue-600"></i> Historique des Situations
+  </h1>
+
+  <!-- Toolbar -->
+  <div class="flex flex-wrap gap-3 items-end bg-white/70 p-3 rounded-lg border border-gray-200 mb-3">
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Vue</label>
+      <div class="btn-group">
+        <button id="btnViewCal" class="btn btn-sm btn-active">Calendrier</button>
+        <button id="btnViewTbl" class="btn btn-sm">Table</button>
+      </div>
+    </div>
+
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Type</label>
+      <select id="filterType" class="select select-bordered select-sm w-56">
+        <option value="">Tous les types</option>
+      </select>
+    </div>
+
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Statut</label>
+      <div class="flex gap-2">
+        <button class="toolbar-chip" data-status="">Tous</button>
+        <button class="toolbar-chip" data-status="en attente">En attente</button>
+        <button class="toolbar-chip" data-status="actif">Actif</button>
+        <button class="toolbar-chip" data-status="terminé">Terminé</button>
+      </div>
+    </div>
+
+    {% if request.user.role in 'MANAGER HR ADMIN' %}
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Employé</label>
+      <input id="filterEmployee" class="input input-bordered input-sm w-56" placeholder="Nom (contient)" />
+    </div>
+    {% endif %}
+
+    <div class="flex-1"></div>
+    {% if request.user.role in 'HR ADMIN' %}
+      <a id="btnExportCsv" class="btn btn-sm">Exporter CSV</a>
+      <button id="btnPrint" class="btn btn-sm">Imprimer</button>
+    {% endif %}
+  </div>
+
+  <!-- Legend -->
+  <div class="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
+    <span><span class="legend-dot legend-pending"></span> En attente</span>
+    <span><span class="legend-dot legend-active"></span> Actif</span>
+    <span><span class="legend-dot legend-done"></span> Terminé</span>
+    <span class="pill pill-warn">Suspend paie</span>
+  </div>
+
+  <!-- Calendar -->
+  <div id="wrapCalendar" class="block">
+    <div id="calendar" class="min-h-[28rem] bg-gray-100 shadow-xl rounded-lg border-l-4 border-blue-600 p-4"></div>
+  </div>
+
+  <!-- Table -->
+  <div id="wrapTable" class="hidden">
+    <div class="overflow-x-auto bg-white rounded-lg shadow">
+      <table class="table w-full">
+        <thead>
+          <tr>
+            <th>Employé</th>
+            <th>Type</th>
+            <th>Début</th>
+            <th>Fin</th>
+            <th>Statut</th>
+            <th>Suspend</th>
+            <th>Doc</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="historyTbody"></tbody>
+      </table>
+    </div>
+    <div class="mt-3 flex items-center gap-2">
+      <button id="prevPage" class="btn btn-sm">Préc</button>
+      <span id="pageInfo" class="text-sm"></span>
+      <button id="nextPage" class="btn btn-sm">Suiv</button>
+    </div>
+  </div>
+
+  <!-- Modal (read-only details) -->
+  <input type="checkbox" id="eventModal" class="modal-toggle" />
+  <div class="modal">
+    <div class="modal-box bg-white">
+      <h3 class="font-bold text-lg">Détails de la Situation</h3>
+      <div class="py-4">
+        <p><strong>Employé:</strong> <span id="eventEmployee"></span></p>
+        <p><strong>Type:</strong> <span id="eventSituationType"></span></p>
+        <p><strong>Début:</strong> <span id="eventStart"></span></p>
+        <p><strong>Fin:</strong> <span id="eventEnd"></span></p>
+        <p><strong>Statut:</strong> <span id="eventStatus"></span></p>
+        <p><strong>Document:</strong> <span id="eventDocument"></span></p>
+        <p><strong>Disponibilité:</strong> <span id="eventAvailabilityReason"></span></p>
+        <p><strong>Exclusion:</strong> <span id="eventExclusionReason"></span></p>
+        <p><strong>Sortie:</strong> <span id="eventExitType"></span></p>
+      </div>
+      <div class="modal-action"><label for="eventModal" class="btn btn-secondary">Fermer</label></div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/locales-all.global.min.js"></script>
+<script>
+(function(){
+  const ROLE = "{{ request.user.role|default:'' }}".trim().toUpperCase();
+  const userId = "{{ request.user.id|default:'' }}";
+  const employeeId = "{{ request.user.employee.id|default:'' }}";
+  function getCsrfToken(){ const c=document.cookie.split('; ').find(r=>r.startsWith('csrftoken=')); return c?c.split('=')[1]:''; }
+  const fmt = d => moment(d).format('YYYY-MM-DD');
+
+  const state = { status:"", typeId:"", employeeSearch:"", page:1, pageSize:10 };
+
+  function loadTypes(){
+    $.get('/api/v1/situation-types/', data=>{
+      const list=(data.results||data);
+      const sel=$('#filterType').empty().append('<option value="">Tous les types</option>');
+      list.forEach(x=> sel.append(`<option value="${x.id}">${x.name}</option>`));
+    });
+  }
+
+  function toEvent(item){
+    const emp=item.employee||{}; const st=item.situation_type||{};
+    const endExclusive = item.end_date ? moment(item.end_date).add(1,'day').format('YYYY-MM-DD') : null;
+    return {
+      id:item.id, start:item.start_date, end:endExclusive, allDay:true,
+      title:`${(emp.first_name||'')} ${(emp.last_name||'')}`.trim()+(st.name?` — ${st.name}`:''),
+      extendedProps:{ employee:emp, situation_type:st, status:item.status, document:item.document,
+        availability_reason:item.availability_reason, exclusion_reason:item.exclusion_reason, exit_type:item.exit_type }
+    };
+  }
+  function eventContent(arg){
+    const st=arg.event.extendedProps.situation_type||{}; const status=String(arg.event.extendedProps.status||'').toLowerCase();
+    const wrap=document.createElement('div');
+    const t=document.createElement('div'); t.textContent=arg.event.title; t.style.fontWeight='600'; t.style.fontSize='12px';
+    const pills=document.createElement('div'); pills.style.display='flex'; pills.style.flexWrap='wrap'; pills.style.gap='4px';
+    const mk=(tx,cl)=>{ const b=document.createElement('span'); b.className='pill '+cl; b.textContent=tx; return b; };
+    if (status==='en attente') pills.appendChild(mk('EN ATTENTE','pill-warn'));
+    else if (status==='actif') pills.appendChild(mk('ACTIF','pill-ok'));
+    else if (status==='terminé') pills.appendChild(mk('TERMINÉ','pill-stop'));
+    if (st.suspend_payroll) pills.appendChild(mk('SUSPEND PAIE','pill-warn'));
+    if (st.code) pills.appendChild(mk(st.code.toUpperCase(),'pill-muted'));
+    wrap.appendChild(t); wrap.appendChild(pills);
+    return { domNodes:[wrap] };
+  }
+
+  function pickDocUrl(obj){ if(!obj) return null; return obj.file?.url || obj.file_url || obj.url || (typeof obj.file==='string' ? obj.file : null); }
+  function pickDocLabel(obj){ if(!obj) return null; return obj.original_name || obj.filename || obj.name || (typeof obj.file==='string' ? obj.file.split('/').pop() : null); }
+  async function extractDocLink(detail){
+    if(!detail) return null;
+    let docObj = detail.document_detail || (typeof detail.document==='object' ? detail.document : null) || null;
+    let docId  = (typeof detail.document==='number') ? detail.document : (docObj?.id || null);
+    let href   = pickDocUrl(docObj) || detail.document_file || null; let label = pickDocLabel(docObj);
+    if (!href && docId){ try{ const doc=await $.getJSON(`/api/v1/documents/${docId}/`); href=pickDocUrl(doc)||doc?.file||doc?.url||href; label=label||pickDocLabel(doc);}catch(_){ } }
+    if (href && !/^https?:\/\//.test(href) && !href.startsWith('/')) href='/'+href;
+    if (!label && href){ try{ label=decodeURIComponent(href.split('/').pop()); }catch{ label=href.split('/').pop(); } }
+    return href?{href,label}:null;
+  }
+  async function renderDocumentLink(eventId){
+    const el=document.getElementById('eventDocument'); if(!el) return;
+    el.textContent='Chargement...';
+    try{ const detail=await $.getJSON(`/api/v1/situations/situations/${eventId}/`); const link=await extractDocLink(detail);
+      el.innerHTML = link ? `<a href="${link.href}" target="_blank" rel="noopener" class="underline text-blue-600">${link.label||'Voir'}</a>` : 'Aucun';
+    }catch(_){ el.textContent='Aucun'; }
+  }
+
+  // Calendar
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale:'fr',
+    headerToolbar:{left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,timeGridDay'},
+    selectable:false, editable:false, height:'auto', expandRows:true,
+    events: function(info, success, failure){
+      const start=fmt(info.start), end=fmt(info.end);
+      const params = new URLSearchParams();
+      params.set('date_range', `${start} to ${end}`);
+      params.set('active', 'false');
+      if (state.status) params.set('status', state.status);
+      if (state.typeId) params.set('situation_type_id', state.typeId);
+      if (state.employeeSearch) params.set('search', state.employeeSearch);
+      fetch(`/api/v1/situations/situations/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} })
+        .then(r=>r.json()).then(data=> success((data.results||data||[]).map(toEvent)))
+        .catch(err=>{ console.error(err); failure(err); alert('Erreur de chargement'); });
+    },
+    eventContent: eventContent,
+    eventClick: function(info){
+      const emp=info.event.extendedProps.employee||{}; const st=info.event.extendedProps.situation_type||{};
+      $('#eventEmployee').text(`${emp.first_name||''} ${emp.last_name||''}`.trim()||'N/A');
+      $('#eventSituationType').text(st.name||'N/A');
+      $('#eventStart').text(moment(info.event.start).format('YYYY-MM-DD'));
+      $('#eventEnd').text(info.event.end ? moment(info.event.end).subtract(1,'days').format('YYYY-MM-DD') : '—');
+      $('#eventStatus').text((info.event.extendedProps.status||'').toUpperCase());
+      $('#eventAvailabilityReason').text(info.event.extendedProps.availability_reason || '—');
+      $('#eventExclusionReason').text(info.event.extendedProps.exclusion_reason || '—');
+      $('#eventExitType').text(info.event.extendedProps.exit_type || '—');
+      renderDocumentLink(info.event.id);
+      document.getElementById('eventModal').checked = true;
+    }
+  });
+  calendar.render();
+
+  // Table view
+  function loadTable(){
+    const params = new URLSearchParams();
+    params.set('active','false');
+    params.set('page', state.page);
+    params.set('page_size', state.pageSize);
+    if (state.status) params.set('status', state.status);
+    if (state.typeId) params.set('situation_type_id', state.typeId);
+    if (state.employeeSearch) params.set('search', state.employeeSearch);
+
+    $.get(`/api/v1/situations/situations/?${params.toString()}`, data=>{
+      const results = data.results || data;
+      const tbody = $('#historyTbody').empty();
+      results.forEach(row=>{
+        const emp=row.employee||{}; const st=row.situation_type||{};
+        const doc = row.document ? (row.document.original_name || row.document.filename || 'Voir') : '';
+        const docLink = row.document ? `<a href="${(row.document.file?.url||row.document.url||'#')}" target="_blank" class="link link-primary">doc</a>` : '';
+        tbody.append(`<tr>
+          <td>${(emp.first_name||'')} ${(emp.last_name||'')}</td>
+          <td>${st.name||''} ${st.suspend_payroll?'<span class="pill pill-warn ml-1">SUSP</span>':''}</td>
+          <td>${row.start_date||''}</td>
+          <td>${row.end_date||''}</td>
+          <td>${(row.status||'').toUpperCase()}</td>
+          <td>${st.suspend_payroll?'Oui':'Non'}</td>
+          <td>${docLink}</td>
+          <td><button class="btn btn-xs" onclick="viewSituation(${row.id})">Voir</button></td>
+        </tr>`);
+      });
+      $('#pageInfo').text(data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`);
+    });
+  }
+  window.viewSituation = function(id){
+    $.get(`/api/v1/situations/situations/${id}/`, data=>{
+      const emp=data.employee||{}; const st=data.situation_type||{};
+      $('#eventEmployee').text(`${emp.first_name||''} ${emp.last_name||''}`.trim()||'N/A');
+      $('#eventSituationType').text(st.name||'N/A');
+      $('#eventStart').text(data.start_date||'');
+      $('#eventEnd').text(data.end_date||'');
+      $('#eventStatus').text((data.status||'').toUpperCase());
+      $('#eventAvailabilityReason').text(data.availability_reason || '—');
+      $('#eventExclusionReason').text(data.exclusion_reason || '—');
+      $('#eventExitType').text(data.exit_type || '—');
+      renderDocumentLink(id);
+      document.getElementById('eventModal').checked=true;
+    });
+  }
+
+  // Toolbar wiring
+  loadTypes();
+  $('#filterType').on('change', function(){ state.typeId=this.value; refresh(); });
+  $('.toolbar-chip').on('click', function(){ $('.toolbar-chip').removeClass('active'); $(this).addClass('active'); state.status=this.dataset.status||''; refresh(); });
+  $('#filterEmployee').on('input', function(){ state.employeeSearch=this.value.trim(); clearTimeout(window._empTimer); window._empTimer=setTimeout(()=>refresh(), 300); });
+  $('#btnViewCal').on('click', function(){ $('#wrapCalendar').removeClass('hidden').addClass('block'); $('#wrapTable').addClass('hidden'); $(this).addClass('btn-active'); $('#btnViewTbl').removeClass('btn-active'); calendar.refetchEvents(); });
+  $('#btnViewTbl').on('click', function(){ $('#wrapTable').removeClass('hidden'); $('#wrapCalendar').addClass('hidden'); $(this).addClass('btn-active'); $('#btnViewCal').removeClass('btn-active'); loadTable(); });
+  $('#prevPage').on('click', function(){ if (state.page>1){ state.page--; loadTable(); } });
+  $('#nextPage').on('click', function(){ state.page++; loadTable(); });
+
+  {% if request.user.role in 'HR ADMIN' %}
+  $('#btnExportCsv').on('click', function(e){
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (state.status) params.set('status', state.status);
+    if (state.typeId) params.set('situation_type_id', state.typeId);
+    if (state.employeeSearch) params.set('search', state.employeeSearch);
+    window.location.href = `/api/v1/situations/situations/export_csv/?${params.toString()}`;
+  });
+  $('#btnPrint').on('click', function(){
+    const w=window.open('', '_blank');
+    w.document.write('<html><head><title>Impression</title></head><body>');
+    w.document.write(document.getElementById('wrapTable').innerHTML);
+    w.document.write('</body></html>'); w.document.close(); w.focus(); w.print(); w.close();
+  });
+  {% endif %}
+
+  function refresh(){ if ($('#wrapCalendar').is(':visible')) calendar.refetchEvents(); else loadTable(); }
+})();
+</script>
+{% endblock %} {% endcomment %}
+
+
+
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet" />
+<style>
+  /* keep this minimal so we don't fight the theme */
+  .fc-event { cursor: pointer; border-radius: .5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-primary uppercase flex items-center gap-2 mb-4">
+    <i class="fas fa-history text-primary"></i> Historique des Situations
+  </h1>
+
+  <!-- Toolbar -->
+  <div class="flex flex-wrap gap-3 items-end bg-base-500 p-3 rounded-lg border border-gray-200 mb-3">
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Vue</label>
+      <div class="btn-group">
+        <button id="btnViewCal" class="btn btn-sm btn-active bg-blue-100 text-blue-800 hover:bg-blue-300">Calendrier</button>
+        <button id="btnViewTbl" class="btn btn-sm bg-blue-100 text-blue-800 hover:bg-blue-300">Table</button>
+      </div>
+    </div>
+
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Type</label>
+      <select id="filterType" class="select select-bordered select-sm w-56 bg-blue-100 text-blue-800 border border-base-100">
+        <option value="">Tous les types</option>
+      </select>
+    </div>
+
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Statut</label>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm status-chip btn-active" data-status="">Tous</button>
+        <button class="btn btn-outline btn-sm status-chip" data-status="en attente">En attente</button>
+        <button class="btn btn-outline btn-sm status-chip" data-status="actif">Actif</button>
+        <button class="btn btn-outline btn-sm status-chip" data-status="terminé">Terminé</button>
+      </div>
+    </div>
+
+    {% if request.user.role in 'MANAGER HR ADMIN' %}
+    <div class="flex flex-col">
+      <label class="text-xs text-gray-500 mb-1">Employé</label>
+      <input id="filterEmployee" class="input input-bordered input-sm w-56 bg-blue-100 text-blue-800 border border-base-100" placeholder="Nom (contient)" />
+    </div>
+    {% endif %}
+
+    <div class="flex-1"></div>
+    {% if request.user.role in 'HR ADMIN' %}
+      <a id="btnExportCsv" class="btn btn-sm bg-blue-400 text-white hover:bg-blue-500 hover:text-white">Exporter CSV</a>
+      <button id="btnPrint" class="btn btn-sm bg-blue-400 text-white hover:bg-blue-500 hover:text-white">Imprimer</button>
+    {% endif %}
+  </div>
+
+  <!-- Legend -->
+  <div class="flex flex-wrap items-center gap-4 text-sm text-base-content/70 mb-4">
+    <span class="text-gray-500"><span class="badge badge-xs badge-warning mr-2">&nbsp;</span> En attente</span>
+    <span class="text-gray-500"><span class="badge badge-xs badge-success mr-2">&nbsp;</span> Actif</span>
+    <span class="text-gray-500"> <span class="badge badge-xs badge-error mr-2">&nbsp;</span>Terminé</span>
+    <span class="badge badge-warning badge-sm">Suspend paie</span>
+  </div>
+
+  <!-- Calendar -->
+  <div id="wrapCalendar" class="block">
+    <div id="calendar" class="min-h-[28rem] bg-gray-100 shadow-xl rounded-lg border-l-4 border-blue-600 p-4"></div>
+  </div>
+
+  <!-- Table -->
+  <div id="wrapTable" class="hidden">
+    <div class="overflow-x-auto bg-gray-100 shadow-xl rounded-lg border-l-4 border-blue-600">
+      <table class="table w-full"> 
+        <thead>
+          <tr>
+            <th class="whitespace-nowrap text-blue-600">Employé</th>
+            <th class="whitespace-nowrap text-blue-600">Type</th>
+            <th class="whitespace-nowrap text-blue-600">Début</th>
+            <th class="whitespace-nowrap text-blue-600">Fin</th>
+            <th class="whitespace-nowrap text-blue-600">Statut</th>
+            <th class="whitespace-nowrap text-blue-600">Suspend</th>
+            <th class="whitespace-nowrap text-blue-600">Doc</th>
+            <th class="whitespace-nowrap text-blue-600">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="historyTbody"></tbody>
+      </table>
+    </div>
+    <div class="mt-3 flex items-center gap-2">
+      <button id="prevPage" class="btn btn-sm">Préc</button>
+      <span id="pageInfo" class="text-sm"></span>
+      <button id="nextPage" class="btn btn-sm">Suiv</button>
+    </div>
+  </div>
+
+  <!-- Modal (read-only details) -->
+  <input type="checkbox" id="eventModal" class="modal-toggle" />
+  <div class="modal">
+    <div class="modal-box bg-white/90 backdrop-blur-sm">
+      <h3 class="font-bold text-lg">Détails de la Situation</h3>
+      <div class="py-4">
+        <p><strong>Employé:</strong> <span id="eventEmployee"></span></p>
+        <p><strong>Type:</strong> <span id="eventSituationType"></span></p>
+        <p><strong>Début:</strong> <span id="eventStart"></span></p>
+        <p><strong>Fin:</strong> <span id="eventEnd"></span></p>
+        <p><strong>Statut:</strong> <span id="eventStatus"></span></p>
+        <p><strong>Document:</strong> <span id="eventDocument"></span></p>
+        <p><strong>Disponibilité:</strong> <span id="eventAvailabilityReason"></span></p>
+        <p><strong>Exclusion:</strong> <span id="eventExclusionReason"></span></p>
+        <p><strong>Sortie:</strong> <span id="eventExitType"></span></p>
+      </div>
+      <div class="modal-action"><label for="eventModal" class="btn btn-secondary">Fermer</label></div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/locales-all.global.min.js"></script>
+<script>
+(function(){
+  const ROLE = "{{ request.user.role|default:'' }}".trim().toUpperCase();
+  const userId = "{{ request.user.id|default:'' }}";
+  const employeeId = "{{ request.user.employee.id|default:'' }}";
+  function getCsrfToken(){ const c=document.cookie.split('; ').find(r=>r.startsWith('csrftoken=')); return c?c.split('=')[1]:''; }
+  const fmt = d => moment(d).format('YYYY-MM-DD');
+
+  const state = { status:"", typeId:"", employeeSearch:"", page:1, pageSize:10 };
+
+  function loadTypes(){
+    $.get('/api/v1/situation-types/', data=>{
+      const list=(data.results||data);
+      const sel=$('#filterType').empty().append('<option value="">Tous les types</option>');
+      list.forEach(x=> sel.append(`<option value="${x.id}">${x.name}</option>`));
+    });
+  }
+
+  function toEvent(item){
+    const emp=item.employee||{}; const st=item.situation_type||{};
+    const endExclusive = item.end_date ? moment(item.end_date).add(1,'day').format('YYYY-MM-DD') : null;
+    return {
+      id:item.id, start:item.start_date, end:endExclusive, allDay:true,
+      title:`${(emp.first_name||'')} ${(emp.last_name||'')}`.trim()+(st.name?` — ${st.name}`:''),
+      extendedProps:{ employee:emp, situation_type:st, status:item.status, document:item.document,
+        availability_reason:item.availability_reason, exclusion_reason:item.exclusion_reason, exit_type:item.exit_type }
+    };
+  }
+
+  // daisyUI badges inside events (no custom colors)
+  function eventContent(arg){
+    const st=arg.event.extendedProps.situation_type||{};
+    const status=String(arg.event.extendedProps.status||'').toLowerCase();
+
+    const wrap=document.createElement('div');
+    const title=document.createElement('div');
+    title.textContent=arg.event.title;
+    title.className='font-semibold text-xs';
+
+    const pills=document.createElement('div');
+    pills.className='flex flex-wrap gap-1 mt-0.5';
+
+    const mk=(label,classes)=>{ const b=document.createElement('span'); b.className=`badge badge-sm ${classes}`; b.textContent=label; return b; };
+
+    if (status==='en attente') pills.appendChild(mk('EN ATTENTE','badge-warning'));
+    else if (status==='actif') pills.appendChild(mk('ACTIF','badge-success'));
+    else if (status==='terminé') pills.appendChild(mk('TERMINÉ','badge-error'));
+    if (st.suspend_payroll) pills.appendChild(mk('SUSPEND PAIE','badge-warning'));
+    if (st.code) pills.appendChild(mk(st.code.toUpperCase(),'badge-ghost'));
+
+    wrap.appendChild(title); wrap.appendChild(pills);
+    return { domNodes:[wrap] };
+  }
+
+  function pickDocUrl(obj){ if(!obj) return null; return obj.file?.url || obj.file_url || obj.url || (typeof obj.file==='string' ? obj.file : null); }
+  function pickDocLabel(obj){ if(!obj) return null; return obj.original_name || obj.filename || obj.name || (typeof obj.file==='string' ? obj.file.split('/').pop() : null); }
+  async function extractDocLink(detail){
+    if(!detail) return null;
+    let docObj = detail.document_detail || (typeof detail.document==='object' ? detail.document : null) || null;
+    let docId  = (typeof detail.document==='number') ? detail.document : (docObj?.id || null);
+    let href   = pickDocUrl(docObj) || detail.document_file || null; let label = pickDocLabel(docObj);
+    if (!href && docId){ try{ const doc=await $.getJSON(`/api/v1/documents/${docId}/`); href=pickDocUrl(doc)||doc?.file||doc?.url||href; label=label||pickDocLabel(doc);}catch(_){ } }
+    if (href && !/^https?:\/\//.test(href) && !href.startsWith('/')) href='/'+href;
+    if (!label && href){ try{ label=decodeURIComponent(href.split('/').pop()); }catch{ label=href.split('/').pop(); } }
+    return href?{href,label}:null;
+  }
+  async function renderDocumentLink(eventId){
+    const el=document.getElementById('eventDocument'); if(!el) return;
+    el.textContent='Chargement...';
+    try{ const detail=await $.getJSON(`/api/v1/situations/situations/${eventId}/`); const link=await extractDocLink(detail);
+      el.innerHTML = link ? `<a href="${link.href}" target="_blank" rel="noopener" class="link link-primary">${link.label||'Voir'}</a>` : 'Aucun';
+    }catch(_){ el.textContent='Aucun'; }
+  }
+  // Normalize + label a document into { href, label }
+  function resolveDocLink(doc){
+    if (!doc) return null;
+    let href = doc?.file?.url || doc?.file_url || doc?.url || (typeof doc?.file === 'string' ? doc.file : null);
+    if (!href) return null;
+    if (!/^https?:\/\//.test(href) && !href.startsWith('/')) href = '/' + href;
+
+    let label = doc.original_name || doc.filename || doc.name || null;
+    if (!label) {
+        try { label = decodeURIComponent(href.split('/').pop()); }
+        catch { label = href.split('/').pop(); }
+    }
+    return { href, label };
+    }
+
+
+  // Calendar
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale:'fr',
+    headerToolbar:{left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,timeGridDay'},
+    selectable:false, editable:false, height:'auto', expandRows:true,
+    events: function(info, success, failure){
+      const start=fmt(info.start), end=fmt(info.end);
+      const params = new URLSearchParams();
+      params.set('date_range', `${start} to ${end}`);
+      params.set('active', 'false');
+      if (state.status) params.set('status', state.status);
+      if (state.typeId) params.set('situation_type_id', state.typeId);
+      if (state.employeeSearch) params.set('search', state.employeeSearch);
+      fetch(`/api/v1/situations/situations/?${params.toString()}`, { headers:{'X-Requested-With':'XMLHttpRequest'} })
+        .then(r=>r.json()).then(data=> success((data.results||data||[]).map(toEvent)))
+        .catch(err=>{ console.error(err); failure(err); alert('Erreur de chargement'); });
+    },
+    eventContent: eventContent,
+    eventClick: function(info){
+      const emp=info.event.extendedProps.employee||{}; const st=info.event.extendedProps.situation_type||{};
+      $('#eventEmployee').text(`${emp.first_name||''} ${emp.last_name||''}`.trim()||'N/A');
+      $('#eventSituationType').text(st.name||'N/A');
+      $('#eventStart').text(moment(info.event.start).format('YYYY-MM-DD'));
+      $('#eventEnd').text(info.event.end ? moment(info.event.end).subtract(1,'days').format('YYYY-MM-DD') : '—');
+      $('#eventStatus').text((info.event.extendedProps.status||'').toUpperCase());
+      $('#eventAvailabilityReason').text(info.event.extendedProps.availability_reason || '—');
+      $('#eventExclusionReason').text(info.event.extendedProps.exclusion_reason || '—');
+      $('#eventExitType').text(info.event.extendedProps.exit_type || '—');
+      renderDocumentLink(info.event.id);
+      document.getElementById('eventModal').checked = true;
+    }
+  });
+  calendar.render();
+
+  // Table view
+  function loadTable(){
+    const params = new URLSearchParams();
+    params.set('active','false');
+    params.set('page', state.page);
+    params.set('page_size', state.pageSize);
+    if (state.status) params.set('status', state.status);
+    if (state.typeId) params.set('situation_type_id', state.typeId);
+    if (state.employeeSearch) params.set('search', state.employeeSearch);
+
+    $.get(`/api/v1/situations/situations/?${params.toString()}`, data=>{
+      const results = data.results || data;
+      const tbody = $('#historyTbody').empty();
+      results.forEach(row=>{
+        const emp=row.employee||{}; const st=row.situation_type||{};
+        // const docLink = row.document ? `<a href="${(row.document.file?.url||row.document.url||'#')}" target="_blank" class="link link-primary">doc</a>` : '';
+        const link = resolveDocLink(row.document);
+
+        function truncateLabel(label, maxLength = 20) {
+        if (!label) return '';
+        return label.length > maxLength ? label.slice(0, maxLength) + '…' : label;
+        }
+        
+        const docLink = link 
+        ? `<a href="${link.href}" target="_blank" rel="noopener" class="link link-primary">
+            ${truncateLabel(link.label || 'doc')}
+            </a>`
+        : '';
+
+        tbody.append(`<tr>
+          <td>${(emp.first_name||'')} ${(emp.last_name||'')}</td>
+          <td>${st.name||''} ${st.suspend_payroll?'<span class="badge badge-warning badge-xs ml-1">SUSP</span>':''}</td>
+          <td>${row.start_date||''}</td>
+          <td>${row.end_date||''}</td>
+          <td><span class="badge badge-sm ${row.status==='en attente'?'badge-warning':(row.status==='actif'?'badge-success':(row.status==='terminé'?'badge-error':'badge-ghost'))}">${(row.status||'').toUpperCase()}</span></td>
+          <td>${st.suspend_payroll?'Oui':'Non'}</td>
+          <td>${docLink}</td>
+          <td><button class="btn btn-xs" onclick="viewSituation(${row.id})">Voir</button></td>
+        </tr>`);
+      });
+      $('#pageInfo').text(data.count ? `Page ${state.page} — ${data.count} éléments` : `Page ${state.page}`);
+    });
+  }
+  window.viewSituation = function(id){
+    $.get(`/api/v1/situations/situations/${id}/`, data=>{
+      const emp=data.employee||{}; const st=data.situation_type||{};
+      $('#eventEmployee').text(`${emp.first_name||''} ${emp.last_name||''}`.trim()||'N/A');
+      $('#eventSituationType').text(st.name||'N/A');
+      $('#eventStart').text(data.start_date||'');
+      $('#eventEnd').text(data.end_date||'');
+      $('#eventStatus').text((data.status||'').toUpperCase());
+      $('#eventAvailabilityReason').text(data.availability_reason || '—');
+      $('#eventExclusionReason').text(data.exclusion_reason || '—');
+      $('#eventExitType').text(data.exit_type || '—');
+      renderDocumentLink(id);
+      document.getElementById('eventModal').checked=true;
+    });
+  }
+
+  // Toolbar wiring
+  loadTypes();
+
+  // status chips -> toggle 'btn-active' class
+  $(document).on('click', '.status-chip', function(){
+    $('.status-chip').removeClass('btn-active bg-blue-400 text-white'); // reset all
+    $(this).addClass('btn-active bg-blue-400 text-white'); // active button
+    state.status=this.dataset.status||'';
+    refresh();
+  });
+
+  $('#filterType').on('change', function(){ state.typeId=this.value; refresh(); });
+  $('#filterEmployee').on('input', function(){
+    state.employeeSearch=this.value.trim();
+    clearTimeout(window._empTimer);
+    window._empTimer=setTimeout(()=>refresh(), 300);
+  });
+
+  $('#btnViewCal').on('click', function(){
+    $('#wrapCalendar').removeClass('hidden').addClass('block');
+    $('#wrapTable').addClass('hidden');
+    $(this).addClass('btn-active bg-blue-300 text-blue-900');
+    $('#btnViewTbl').removeClass('btn-active bg-blue-300 text-blue-900').addClass('bg-blue-200 text-blue-800');
+    calendar.refetchEvents();
+  });
+  $('#btnViewTbl').on('click', function(){
+    $('#wrapTable').removeClass('hidden');
+    $('#wrapCalendar').addClass('hidden');
+    $(this).addClass('btn-active bg-blue-300 text-blue-900');
+    $('#btnViewCal').removeClass('btn-active bg-blue-300 text-blue-900').addClass('bg-blue-200 text-blue-800');
+    loadTable();
+  });
+  $('#prevPage').on('click', function(){ if (state.page>1){ state.page--; loadTable(); } });
+  $('#nextPage').on('click', function(){ state.page++; loadTable(); });
+
+  {% if request.user.role in 'HR ADMIN' %}
+  $('#btnExportCsv').on('click', function(e){
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (state.status) params.set('status', state.status);
+    if (state.typeId) params.set('situation_type_id', state.typeId);
+    if (state.employeeSearch) params.set('search', state.employeeSearch);
+    window.location.href = `/api/v1/situations/situations/export_csv/?${params.toString()}`;
+  });
+  $('#btnPrint').on('click', function(){
+    const w=window.open('', '_blank');
+    w.document.write('<html><head><title>Impression</title></head><body class="p-4">');
+    w.document.write(document.getElementById('wrapTable').innerHTML);
+    w.document.write('</body></html>'); w.document.close(); w.focus(); w.print(); w.close();
+  });
+  {% endif %}
+
+  function refresh(){ if ($('#wrapCalendar').is(':visible')) calendar.refetchEvents(); else loadTable(); }
+})();
+</script>
+{% endblock %}
+
+
+
+
+
+
+
+

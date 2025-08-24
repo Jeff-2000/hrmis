@@ -1,0 +1,509 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<style>
+    @media (max-width: 640px) {
+        #leaveTable th, #leaveTable td {
+            font-size: 0.75rem; /* Smaller font on mobile */
+            padding: 0.5rem; /* Reduced padding */
+        }
+        #leaveTable .actions-cell {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+        #leaveTable .actions-cell .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+    }
+</style>
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-calendar-alt text-blue-600"></i> Mes Demandes de Congé
+    </h1>
+
+    <!-- Leave Balance Summary -->
+    <div class="mb-8 bg-white shadow-xl rounded-lg border-l-4 border-blue-600 p-4">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Solde de Congés</h2>
+        <div id="balanceSummary" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <p class="text-gray-500">Chargement des soldes...</p>
+        </div>
+    </div>
+
+    <!-- Leave Requests -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">Mes Congés</h2>
+            <a href="{% url 'my_leave_create' %}" class="btn bg-blue-500 hover:bg-blue-600 text-white">Nouvelle Demande</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[120px]">Type de Congé</th>
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[100px]">Date de Début</th>
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[100px]">Date de Fin</th>
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[80px]">Jours Ouvrables</th>
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[80px]">Statut</th>
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[120px] hidden sm:table-cell">Approuvé Par</th>
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[120px] hidden sm:table-cell">Raison du Rejet</th>
+                        <th class="py-3 px-4 text-left text-gray-800 min-w-[100px]">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="leaveTable"></tbody>
+            </table>
+        </div>
+        <div id="pagination" class="flex justify-between items-center p-4">
+            <div>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" disabled>Précédent</button>
+                <span id="pageInfo" class="text-gray-600"></span>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage">Suivant</button>
+            </div>
+            <select id="pageSize" class="select select-bordered border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+<!-- Modal de confirmation de suppression -->
+<div id="deleteLeaveModal" class="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-sm p-6">
+        <h2 class="text-lg font-semibold mb-4 text-gray-800">Confirmation</h2>
+        <p class="text-gray-700 mb-6">Voulez-vous vraiment supprimer cette demande de congé&nbsp;?</p>
+        <div class="flex justify-end gap-2">
+            <button id="cancelLeaveDelete" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded">Annuler</button>
+            <button id="confirmLeaveDelete" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    window.Leaves = window.Leaves || {};
+
+    let currentPage = 1;
+    let pageSize = 10;
+    let employeeId = null;
+    const today = new Date('2025-08-07');
+
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        }
+        return null;
+    }
+
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1"><p class="text-sm font-medium">${message}</p></div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    function showModal(content, id = 'leaveModal') {
+        const modal = document.createElement('div');
+        modal.id = id;
+        modal.className = 'modal modal-open';
+        modal.innerHTML = `
+            <div class="modal-box relative max-w-2xl bg-white">
+                <button class="btn btn-sm btn-circle absolute right-2 top-2 bg-red-600 hover:bg-red-700 text-white" onclick="this.closest('.modal').classList.remove('modal-open');this.closest('.modal').remove()">✕</button>
+                ${content}
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    function getDocumentName(document) {
+        if (!document || !document.file) return '-';
+        return document.file.split('/').pop(); // Extract filename from path
+    }
+
+    async function fetchEmployeeId() {
+        try {
+            const response = await fetch('/api/v1/employees/me/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement du profil employé');
+            const data = await response.json();
+            employeeId = data.id;
+            return employeeId;
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+            return null;
+        }
+    }
+
+    async function loadLeaveTypes() {
+        try {
+            const response = await fetch('/api/v1/leave/leave-types/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement des types de congé');
+            const data = await response.json();
+            return data.results || [];
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+            return [];
+        }
+    }
+
+    async function loadLeaveBalances() {
+        try {
+            const response = await fetch('/api/v1/leave/leave-balances/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement des soldes');
+            const data = await response.json();
+            const balances = data.results || [];
+            const balanceSummary = document.getElementById('balanceSummary');
+            balanceSummary.innerHTML = balances.length > 0
+                ? balances.map(balance => `
+                    <div class="p-4 bg-gray-100 rounded-md">
+                        <p><strong>Type:</strong> ${balance.leave_type.name}</p>
+                        <p><strong>Année:</strong> ${balance.year}</p>
+                        <p><strong>Solde:</strong> ${balance.balance} jours</p>
+                    </div>
+                `).join('')
+                : '<p class="text-gray-500">Aucun solde de congé trouvé.</p>';
+        } catch (error) {
+            showToast(`Erreur lors du chargement des soldes: ${error.message}`, 'error');
+        }
+    }
+
+    async function uploadDocument(file) {
+        if (!file) return null;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_type', 'autre');
+        formData.append('status', 'valide');
+        try {
+            const response = await fetch('/api/v1/documents/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: formData
+            });
+            if (!response.ok) throw new Error(`Erreur lors du téléversement du document (${response.status})`);
+            const data = await response.json();
+            return data.id;
+        } catch (error) {
+            showToast(`Erreur lors du téléversement du document: ${error.message}`, 'error');
+            return null;
+        }
+    }
+
+    async function loadLeaveRequests() {
+        const tbody = document.getElementById('leaveTable');
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
+        try {
+            if (!employeeId) {
+                await fetchEmployeeId();
+                if (!employeeId) throw new Error('Impossible de récupérer l\'ID de l\'employé');
+            }
+            const query = new URLSearchParams({
+                page: currentPage,
+                page_size: pageSize,
+                employee_id: employeeId
+            }).toString();
+            const response = await fetch(`/api/v1/leave/leave/?${query}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            const data = await response.json();
+            console.log('API Response:', data); // Debug log
+            const leaves = Array.isArray(data) ? data : data.results || [];
+            const totalCount = data.count || data.total || 0;
+            tbody.innerHTML = leaves.length > 0
+                ? leaves.map(leave => {
+                    console.log('Leave:', leave); // Debug log
+                    const startDate = new Date(leave.start_date);
+                    const canEditDelete = leave.status === 'pending' && startDate > today;
+                    const statusText = {
+                        'pending': 'En attente',
+                        'manager_approved': 'Approuvé par Manager',
+                        'hr_approved': 'Approuvé par HR',
+                        'rejected': 'Rejeté',
+                        'taken': 'Pris'
+                    }[leave.status] || leave.status;
+                    const approver = leave.approved_by ? `${leave.approved_by.first_name} ${leave.approved_by.last_name} (${leave.approved_by.role})` : '-';
+                    const rejectionReason = leave.rejection_reason || leave.rejection_reason === '' ? leave.rejection_reason : '-';
+                    return `
+                        <tr class="border-b border-gray-200">
+                            <td class="py-3 px-4">${leave.leave_type.name}</td>
+                            <td class="py-3 px-4">${new Date(leave.start_date).toLocaleDateString('fr-FR')}</td>
+                            <td class="py-3 px-4">${new Date(leave.end_date).toLocaleDateString('fr-FR')}</td>
+                            <td class="py-3 px-4">${leave.calculate_working_days}</td>
+                            <td class="py-3 px-4">
+                                <span class="badge ${leave.status === 'hr_approved' || leave.status === 'taken' ? 'bg-green-500' : leave.status === 'rejected' ? 'bg-red-500' : leave.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'} text-white">
+                                    ${statusText}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 hidden sm:table-cell">${approver}</td>
+                            <td class="py-3 px-4 text-red-600 hidden sm:table-cell">${rejectionReason}</td>
+                            <td class="py-3 px-4 flex gap-2 actions-cell">
+                                <button class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white" onclick="Leaves.viewLeave(${leave.id})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm bg-yellow-500 hover:bg-yellow-600 text-white ${!canEditDelete ? 'btn-disabled' : ''}" ${!canEditDelete ? 'disabled' : ''} onclick="Leaves.editLeave(${leave.id})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm bg-red-500 hover:bg-red-600 text-white ${!canEditDelete ? 'btn-disabled' : ''}" ${!canEditDelete ? 'disabled' : ''} onclick="Leaves.deleteLeave(${leave.id})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('')
+                : '<tr><td colspan="8" class="text-center py-4 text-gray-500">Aucune demande de congé trouvée.</td></tr>';
+            const totalPages = Math.ceil(totalCount / pageSize) || 1;
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-red-500 py-4 text-center">Erreur: ${error.message}</td></tr>`;
+            showToast(`Erreur lors du chargement: ${error.message}`, 'error');
+        }
+    }
+
+    Leaves.viewLeave = async function(id) {
+        try {
+            const response = await fetch(`/api/v1/leave/leave/${id}/`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement de la demande');
+            const leave = await response.json();
+            console.log('View Leave:', leave); // Debug log
+            const approver = leave.approved_by ? `${leave.approved_by.first_name} ${leave.approved_by.last_name} (${leave.approved_by.role})` : '-';
+            const document = leave.document ? `<a href="${leave.document.file}" target="_blank" class="text-blue-500 hover:underline">${getDocumentName(leave.document)}</a>` : '-';
+            const rejectionReason = leave.rejection_reason || leave.rejection_reason === '' ? leave.rejection_reason : '-';
+            showModal(`
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Détails de la Demande de Congé</h3>
+                <div class="grid grid-cols-1 gap-2">
+                    <div><strong>Type de Congé:</strong> ${leave.leave_type.name}</div>
+                    <div><strong>Date de Début:</strong> ${new Date(leave.start_date).toLocaleDateString('fr-FR')}</div>
+                    <div><strong>Date de Fin:</strong> ${new Date(leave.end_date).toLocaleDateString('fr-FR')}</div>
+                    <div><strong>Jours Ouvrables:</strong> ${leave.calculate_working_days}</div>
+                    <div><strong>Demi-journée:</strong> ${leave.is_half_day ? 'Oui' : 'Non'}</div>
+                    <div><strong>Raison:</strong> ${leave.reason || '-'}</div>
+                    <div><strong>Statut:</strong> ${{
+                        'pending': 'En attente',
+                        'manager_approved': 'Approuvé par Manager',
+                        'hr_approved': 'Approuvé par HR',
+                        'rejected': 'Rejeté',
+                        'taken': 'Pris'
+                    }[leave.status]}</div>
+                    <div><strong>Approuvé Par:</strong> ${approver}</div>
+                    <div><strong>Raison du Rejet:</strong> <span class="text-red-600">${rejectionReason}</span></div>
+                    <div><strong>Document:</strong> ${document}</div>
+                    <div><strong>Demandé le:</strong> ${new Date(leave.requested_at).toLocaleString('fr-FR')}</div>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button class="btn bg-blue-500 hover:bg-blue-600 text-white" onclick="this.closest('.modal').classList.remove('modal-open');this.closest('.modal').remove()">Fermer</button>
+                </div>
+            `);
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    };
+
+    Leaves.editLeave = async function(id) {
+        try {
+            const [leaveResponse, leaveTypes] = await Promise.all([
+                fetch(`/api/v1/leave/leave/${id}/`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                }),
+                loadLeaveTypes()
+            ]);
+            if (!leaveResponse.ok) throw new Error('Erreur lors du chargement de la demande');
+            const leave = await leaveResponse.json();
+            console.log('Edit Leave:', leave); // Debug log
+            const leaveTypeOptions = leaveTypes.map(type => `
+                <option value="${type.id}" ${type.id === leave.leave_type.id ? 'selected' : ''}>${type.name}</option>
+            `).join('');
+            showModal(`
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Modifier la Demande de Congé</h3>
+                <form id="editLeaveForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="hidden" name="id" value="${leave.id}">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Type de Congé</span></label>
+                        <select name="leave_type_id" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                            ${leaveTypeOptions}
+                        </select>
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Date de Début</span></label>
+                        <input type="date" name="start_date" value="${leave.start_date}" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Date de Fin</span></label>
+                        <input type="date" name="end_date" value="${leave.end_date}" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Demi-journée</span></label>
+                        <input type="checkbox" name="is_half_day" class="checkbox checkbox-primary" ${leave.is_half_day ? 'checked' : ''}>
+                    </div>
+                    <div class="form-control col-span-2">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Raison</span></label>
+                        <textarea name="reason" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">${leave.reason || ''}</textarea>
+                    </div>
+                    <div class="form-control col-span-2">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Document (si requis)</span></label>
+                        <input type="file" name="document" class="file-input file-input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" ${leave.leave_type.requires_attachment ? 'required' : ''}>
+                        <p class="text-sm text-gray-500 mt-1">Document actuel: ${leave.document ? `<a href="${leave.document.file}" target="_blank" class="text-blue-500 hover:underline">${getDocumentName(leave.document)}</a>` : 'Aucun'}</p>
+                    </div>
+                    <div class="form-control col-span-2 flex justify-end gap-2 mt-4">
+                        <button type="submit" class="btn bg-blue-500 hover:bg-blue-600 text-white">Enregistrer</button>
+                        <button type="button" class="btn bg-gray-500 hover:bg-gray-600 text-white" onclick="this.closest('.modal').classList.remove('modal-open');this.closest('.modal').remove()">Annuler</button>
+                    </div>
+                </form>
+            `, 'editLeaveModal');
+            document.getElementById('editLeaveForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                data.is_half_day = formData.get('is_half_day') === 'on';
+                if (new Date(data.start_date) > new Date(data.end_date)) {
+                    showToast('La date de début doit être antérieure à la date de fin.', 'error');
+                    return;
+                }
+                const file = formData.get('document');
+                let documentId = null;
+                if (file && file.size > 0) {
+                    documentId = await uploadDocument(file);
+                    if (!documentId) return;
+                }
+                const updateData = new FormData();
+                updateData.append('leave_type_id', data.leave_type_id);
+                updateData.append('start_date', data.start_date);
+                updateData.append('end_date', data.end_date);
+                updateData.append('is_half_day', data.is_half_day);
+                updateData.append('reason', data.reason);
+                if (documentId) updateData.append('document_id', documentId);
+                try {
+                    const response = await fetch(`/api/v1/leave/leave/${leave.id}/`, {
+                        method: 'PATCH',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin',
+                        body: updateData
+                    });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || `Erreur API (${response.status})`);
+                    }
+                    showToast('Demande de congé modifiée avec succès!', 'success');
+                    document.getElementById('editLeaveModal').classList.remove('modal-open');
+                    document.getElementById('editLeaveModal').remove();
+                    loadLeaveRequests();
+                } catch (error) {
+                    showToast(`Erreur lors de l'enregistrement: ${error.message}`, 'error');
+                }
+            });
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    };
+
+    let currentLeaveToDeleteId = null;
+
+    Leaves.deleteLeave = function(id) {
+        const modal = document.getElementById('deleteLeaveModal');
+        const confirmBtn = document.getElementById('confirmLeaveDelete');
+        const cancelBtn = document.getElementById('cancelLeaveDelete');
+
+        currentLeaveToDeleteId = id;
+        modal.classList.remove('hidden');
+
+        cancelBtn.onclick = () => {
+            modal.classList.add('hidden');
+            currentLeaveToDeleteId = null;
+        };
+
+        confirmBtn.onclick = async () => {
+            modal.classList.add('hidden');
+            try {
+                const response = await fetch(`/api/v1/leave/leave/${currentLeaveToDeleteId}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+                showToast('Demande de congé supprimée avec succès!', 'success');
+                loadLeaveRequests();
+            } catch (error) {
+                showToast(`Erreur lors de la suppression: ${error.message}`, 'error');
+            } finally {
+                currentLeaveToDeleteId = null;
+            }
+        };
+    };
+
+    function changePage(delta) {
+        currentPage += delta;
+        loadLeaveRequests();
+    }
+
+    function updatePageSize() {
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadLeaveRequests();
+    }
+
+    document.getElementById('prevPage').addEventListener('click', () => changePage(-1));
+    document.getElementById('nextPage').addEventListener('click', () => changePage(1));
+    document.getElementById('pageSize').addEventListener('change', updatePageSize);
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await fetchEmployeeId();
+        loadLeaveRequests();
+        loadLeaveBalances();
+    });
+})();
+</script>
+{% endblock %}
+
+
+

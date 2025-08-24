@@ -1,0 +1,768 @@
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+    <div class="container mx-auto px-4 py-6">
+        <h1 class="text-2xl font-bold text-primary uppercase flex items-center gap-2 mb-8">
+            <i class="fas fa-calendar text-primary"></i> Calendrier des Congés
+        </h1>
+        <div id="calendar" class="bg-base-500 shadow-xl rounded-lg border-l-4 border-primary p-4"></div>
+    </div>
+
+    <!-- Modal for Event Details -->
+    <input type="checkbox" id="eventModal" class="modal-toggle" />
+    <div class="modal">
+        <div class="modal-box bg-white">
+            <h3 class="font-bold text-lg">Détails de la Demande de Congé</h3>
+            <div class="py-4">
+                <p><strong>Employé:</strong> <span id="eventEmployee"></span></p>
+                <p><strong>Type de Congé:</strong> <span id="eventLeaveType"></span></p>
+                <p><strong>Date de Début:</strong> <span id="eventStart"></span></p>
+                <p><strong>Date de Fin:</strong> <span id="eventEnd"></span></p>
+                <p><strong>Statut:</strong> <span id="eventStatus"></span></p>
+                <p><strong>Raison:</strong> <span id="eventReason"></span></p>
+                <p><strong>Raison du Rejet:</strong> <span id="eventRejectionReason"></span></p>
+                <p><strong>Document:</strong> <span id="eventDocument"></span></p>
+                <div id="eventActions" class="mt-3"></div>
+            </div>
+            <div class="modal-action">
+                <label for="eventModal" class="btn btn-secondary">Fermer</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Creating/Editing Leave Request -->
+    <input type="checkbox" id="createEventModal" class="modal-toggle" />
+    <div class="modal">
+        <div class="modal-box bg-white">
+            <h3 class="font-bold text-lg" id="createEventModalLabel">Nouvelle Demande de Congé</h3>
+
+            <!-- Customized text with the current employee name -->
+            <div id="employeeInfo" class="mb-4 text-gray-800 font-semibold">
+                <p>Chargement des informations de l'employé <code id="currentEmployeeCode"></code>...</p>
+            </div>
+
+            <form id="leaveCreateForm" enctype="multipart/form-data" class="grid grid-cols-1 gap-4 max-w-lg mx-auto">
+                {% csrf_token %}
+
+                <!-- Employee searchable selector (default = current user) -->
+                <div class="form-control" id="employeeField">
+                    <label class="label">
+                        <span class="label-text font-semibold text-gray-800">Employé</span>
+                    </label>
+
+                    <!-- Hidden field actually sent with the form -->
+                    <input type="hidden" name="employee" id="employeeIdInput" />
+
+                    <!-- DaisyUI searchable dropdown -->
+                    <div class="dropdown w-full">
+                        <!-- Trigger -->
+                        <label tabindex="0" id="employeeDropdownBtn"
+                               class="btn btn-outline w-full justify-between">
+                            <span id="employeeSelectedLabel">Sélectionner un employé</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
+                            </svg>
+                        </label>
+
+                        <!-- Menu -->
+                        <div tabindex="0"
+                             class="dropdown-content z-[60] w-full bg-white border border-black shadow-xl rounded-lg p-2">
+                            <!-- search first -->
+                            <input type="text" id="employeeSearchInput"
+                                   class="input input-bordered w-full mb-2  bg-white/20 border border-gray-500 focus:border-black focus:ring-1 focus:ring-black rounded"
+                                   placeholder="Rechercher un employé..." />
+
+                            <!-- results -->
+                            <ul id="employeeResults" class="menu menu-sm max-h-64 overflow-auto w-full bg-white border border-gray-300 rounded shadow-sm divide-y divide-gray-200"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Type de Congé</span></label>
+                    <select name="leave_type_id" id="leaveType" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                        <option value="" disabled selected>Sélectionner un type</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Date de Début</span></label>
+                    <input type="date" name="start_date" id="startDate" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Date de Fin</span></label>
+                    <input type="date" name="end_date" id="endDate" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                </div>
+                <div class="form-control" id="halfDayField" style="display: none;">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Demi-journée</span></label>
+                    <input type="checkbox" name="is_half_day" id="isHalfDay" class="checkbox checkbox-primary">
+                </div>
+                <div class="form-control" id="startTimeField" style="display: none;">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Heure de Début</span></label>
+                    <input type="time" name="start_time" id="startTime" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                </div>
+                <div class="form-control" id="endTimeField" style="display: none;">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Heure de Fin</span></label>
+                    <input type="time" name="end_time" id="endTime" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-semibold text-gray-800">Raison</span></label>
+                    <textarea name="reason" id="reason" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800"></textarea>
+                </div>
+                <div class="form-control" id="documentField">
+                    <label class="label"><span id="documentLabel" class="label-text font-semibold text-gray-800">Justificatif (facultatif)</span></label>
+                    <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                        id="dropZone" role="region" aria-label="Zone de dépôt pour le justificatif">
+                        <input type="file" name="document_file" id="documentInput"
+                            class="file-input file-input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800 opacity-0 absolute inset-0 cursor-pointer"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        <div class="text-center text-gray-600">
+                            <i class="fas fa-upload text-blue-500 text-2xl mb-2"></i>
+                            <p id="dropZoneText">Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)</p>
+                        </div>
+                    </div>
+                    <p id="fileName" class="text-sm text-gray-500 mt-2"></p>
+                    <div id="documentDetails" class="grid grid-cols-1 gap-4 mt-4" style="display: none;">
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Type de Document</span></label>
+                            <select name="document_type" id="documentType" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                                <option value="" disabled selected>Sélectionner un type</option>
+                                <option value="arrete">Arrêté</option>
+                                <option value="certificat_medical">Certificat Médical</option>
+                                <option value="contrat">Contrat</option>
+                                <option value="autre">Autre</option>
+                            </select>
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Date d'Émission</span></label>
+                            <input type="date" name="issuance_date" id="issuanceDate" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Émis Par</span></label>
+                            <input type="text" name="issued_by" id="issuedBy" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-semibold text-gray-800">Note (facultatif)</span></label>
+                            <textarea name="content_text" id="contentText" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-control" id="formErrors" class="alert alert-error hidden">
+                    <ul id="errorList" class="list-disc pl-5"></ul>
+                </div>
+                <div class="modal-action">
+                    <label for="createEventModal" class="btn btn-secondary">Annuler</label>
+                    <button class="btn btn-primary" id="submitLeaveRequest">Soumettre</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const calendarEl = document.getElementById('calendar');
+        if (!calendarEl) return;
+
+        const userRole = "{{ request.user.role|default:'' }}";
+        const userId = "{{ request.user.id|default:'' }}";
+        const employeeId = "{{ request.user.employee.id|default:'' }}";
+        const currentEmployeeName = (`{{ request.user.employee.first_name|default:'' }} {{ request.user.employee.last_name|default:'' }}`.trim()) || `{{ request.user.get_full_name|default:request.user.username }}`;
+
+        // show customized loading text
+        document.getElementById('currentEmployeeCode').textContent = currentEmployeeName || '—';
+
+        // ===== Searchable employee dropdown =====
+        // Adjust endpoint if yours differs; assumes DRF SearchFilter with ?search=
+        const EMPLOYEE_API = '/api/v1/employees/';
+
+        function setSelectedEmployee(id, label) {
+            $('#employeeIdInput').val(id || '');
+            $('#employeeSelectedLabel').text(label || 'Sélectionner un employé');
+        }
+
+        function renderEmployeeResults(list) {
+            const $ul = $('#employeeResults');
+            $ul.empty();
+            if (!list || !list.length) {
+                $ul.append('<li class="text-sm px-3 py-2 opacity-70">Aucun résultat</li>');
+                return;
+            }
+            list.forEach(emp => {
+                const name = `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || (emp.full_name || '');
+                const $li = $(`<li><a class="whitespace-normal">${name}</a></li>`);
+                $li.on('click', () => {
+                    setSelectedEmployee(emp.id, name);
+                    // close dropdown by blurring trigger
+                    document.getElementById('employeeDropdownBtn').blur();
+                });
+                $ul.append($li);
+            });
+        }
+
+        function fetchEmployees(q='') {
+            const url = `${EMPLOYEE_API}?page_size=20${q ? `&search=${encodeURIComponent(q)}` : ''}`;
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }})
+                .then(r => r.json())
+                .then(data => renderEmployeeResults(data.results || data))
+                // .catch(() => renderEmployeeResults([]));
+                .catch(() => { renderEmployeeResults([]); showToast("Impossible de charger la liste des employés.", 'error'); });
+        }
+
+        // Debounced search
+        let empTimer = null;
+        $(document).on('input', '#employeeSearchInput', function() {
+            clearTimeout(empTimer);
+            const term = this.value.trim();
+            empTimer = setTimeout(() => fetchEmployees(term), 250);
+        });
+
+        // Initialize employee picker (default to current user)
+        function initEmployeePicker() {
+            setSelectedEmployee(employeeId, currentEmployeeName || 'Moi');
+            $('#employeeSearchInput').val('');
+            fetchEmployees(''); // first page
+            // Optional: lock for employees; managers/HR/Admin can pick anyone
+            if (userRole === 'EMPLOYEE') {
+                // make it look read-only (server still enforces)
+                $('#employeeDropdownBtn').addClass('btn-disabled cursor-not-allowed');
+            }
+        }
+
+        // ===== FullCalendar setup (same behavior you had, trimmed to relevant parts) =====
+        function getCsrfToken() {
+            const cookie = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+            return cookie ? cookie.split('=')[1] : '';
+        }
+        const fmt = (d) => moment(d).format('YYYY-MM-DD');
+
+        function toEvent(item) {
+            const emp = item.employee || item.employee_detail || {};
+            const lt  = item.leave_type || item.leave_type_detail || {};
+            const endExclusive = moment(item.end_date).add(1, 'day').format('YYYY-MM-DD');
+            return {
+                id: item.id,
+                title: `${(emp.first_name || '')} ${(emp.last_name || '')}`.trim() + (lt.name ? ` — ${lt.name}` : ''),
+                start: item.start_date,
+                end: endExclusive,
+                allDay: !(item.start_time || item.end_time || item.is_hourly),
+                extendedProps: { employee: emp, leave_type: lt, status: item.status, reason: item.reason, rejection_reason: item.rejection_reason }
+            };
+        }
+
+        let activeTip = null;
+        function hideTip() { if (activeTip) { activeTip.remove(); activeTip = null; } }
+        function showDayTooltip(cellEl, date, events) {
+            hideTip();
+            if (!events.length) return;
+            const tip = document.createElement('div');
+            tip.className = "absolute z-50 bg-white border border-base-300 shadow-xl rounded-lg p-3 text-sm max-w-xs";
+            tip.style.pointerEvents = 'none';
+            tip.style.whiteSpace = 'normal';
+            const header = document.createElement('div');
+            header.className = "font-semibold mb-2";
+            header.textContent = `Congés — ${fmt(date)}`;
+            tip.appendChild(header);
+            events.slice(0, 8).forEach(ev => {
+                const line = document.createElement('div');
+                line.className = "flex items-start gap-2 mb-1";
+                const dot = document.createElement('span');
+                dot.className = "mt-1 w-2 h-2 rounded-full bg-primary";
+                const text = document.createElement('button');
+                text.className = "text-left underline hover:no-underline";
+                const emp = ev.extendedProps.employee || {};
+                const lt  = ev.extendedProps.leave_type || {};
+                text.textContent = `${(emp.first_name||'')} ${(emp.last_name||'')}`.trim() + (lt.name ? ` — ${lt.name}` : '');
+                text.onclick = function(e) {
+                    e.preventDefault();
+                    hideTip();
+                    const real = calendar.getEventById(ev.id);
+                    if (real) calendar.trigger('eventClick', { event: real, el: null, jsEvent: e, view: calendar.view });
+                };
+                line.appendChild(dot); line.appendChild(text); tip.appendChild(line);
+            });
+            document.body.appendChild(tip);
+            const rect = cellEl.getBoundingClientRect();
+            tip.style.top  = (window.scrollY + rect.top + 6) + "px";
+            tip.style.left = (window.scrollX + rect.right - tip.offsetWidth - 8) + "px";
+            activeTip = tip;
+        }
+
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'fr',
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+            selectable: true,
+            editable: ['EMPLOYEE','MANAGER','HR','ADMIN'].includes(userRole),
+
+            events: function(info, success, failure) {
+                const start = fmt(info.start), end = fmt(info.end);
+                fetch(`/api/v1/leave/leave/?date_range=${start} to ${end}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' }})
+                    .then(r => r.json())
+                    .then(data => success((data.results || data || []).map(toEvent)))
+                    // .catch(err => { console.error('Error fetching events:', err); failure(err); alert("Erreur lors du chargement des congés."); });
+                    .catch(err => { console.error('Error fetching events:', err); failure(err); showToast("Erreur lors du chargement des congés.", 'error'); });
+
+            },
+
+            eventDidMount: function(info) {
+                const status = info.event.extendedProps.status;
+                const el = info.el;
+                if (status === 'pending') el.classList.add('bg-yellow-500','text-black');
+                else if (status === 'manager_approved') el.classList.add('bg-info','text-white');
+                else if (status === 'hr_approved') el.classList.add('bg-success','text-white');
+                else if (status === 'rejected') el.classList.add('bg-error','text-white');
+                else if (status === 'taken') el.classList.add('bg-neutral','text-white');
+            },
+
+            dayCellDidMount: function(arg) {
+                const cell = arg.el;
+                cell.addEventListener('mouseenter', () => {
+                    const date = arg.date;
+                    const evts = calendar.getEvents().filter(ev => {
+                        const s = moment(ev.start); const e = moment(ev.end || ev.start).clone();
+                        return moment(date).isSameOrAfter(s, 'day') && moment(date).isBefore(e, 'day');
+                    });
+                    showDayTooltip(cell, arg.date, evts);
+                });
+                cell.addEventListener('mouseleave', hideTip);
+            },
+
+            eventClick: function(info) {
+                const emp = info.event.extendedProps.employee || {};
+                const lt  = info.event.extendedProps.leave_type || {};
+                $('#eventEmployee').text(`${emp.first_name||''} ${emp.last_name||''}`.trim() || 'N/A');
+                $('#eventLeaveType').text(lt.name || 'N/A');
+                $('#eventStart').text(moment(info.event.start).format('YYYY-MM-DD'));
+                $('#eventEnd').text(moment(info.event.end).subtract(1,'days').format('YYYY-MM-DD'));
+                $('#eventStatus').text((info.event.extendedProps.status || '').replace('_',' ').toUpperCase());
+                $('#eventReason').text(info.event.extendedProps.reason || 'N/A');
+                $('#eventRejectionReason').text(info.event.extendedProps.rejection_reason || 'N/A');
+
+                // Show document link (fetch full detail to be safe)
+                $('#eventDocument').text('Chargement...');
+                $.get(`/api/v1/leave/leave/${info.event.id}/`, function(detail) {
+                    // Try common shapes: {document: {file:{url}}} or {documents: [{...}]} or direct {document_file}
+                    const docObj  = detail.document || (Array.isArray(detail.documents) ? detail.documents[0] : null) || null;
+                    const url     = docObj?.file?.url || docObj?.url || detail.document_file || null;
+                    const label   = docObj?.original_name || docObj?.filename || (url ? String(url).split('/').pop() : null);
+
+                    if (url) {
+                        $('#eventDocument').html(`<a href="${url}" target="_blank" class="underline text-blue-600">` + (label || 'Voir le document') + `</a>`);
+                    } else {
+                        $('#eventDocument').text('Aucun');
+                    }
+                }).fail(function() {
+                    $('#eventDocument').text('Aucun');
+                });
+
+                let actions = '';
+                if (userRole === 'EMPLOYEE' && emp?.user?.id == userId && info.event.extendedProps.status === 'pending' && moment(info.event.start).isAfter(moment())) {
+                    actions += `<button class="btn btn-warning btn-sm mr-2" onclick="editLeaveRequest(${info.event.id})">Modifier</button>`;
+                    actions += `<button class="btn btn-error btn-sm" onclick="deleteLeaveRequest(${info.event.id})">Supprimer</button>`;
+                }
+                if (userRole === 'MANAGER' && emp?.manager?.user?.id == userId && info.event.extendedProps.status === 'pending') {
+                    actions += `<button class="btn btn-success btn-sm mr-2" onclick="approveLeaveRequest(${info.event.id})">Approuver</button>`;
+                    actions += `<button class="btn btn-error btn-sm" onclick="rejectLeaveRequest(${info.event.id})">Rejeter</button>`;
+                }
+                if ((userRole === 'HR' || userRole === 'ADMIN') && info.event.extendedProps.status === 'manager_approved') {
+                    actions += `<button class="btn btn-success btn-sm mr-2" onclick="hrApproveLeaveRequest(${info.event.id})">Approuver par RH</button>`;
+                    actions += `<button class="btn btn-error btn-sm" onclick="rejectLeaveRequest(${info.event.id})">Rejeter</button>`;
+                }
+                $('#eventActions').html(actions);
+                document.getElementById('eventModal').checked = true;
+            },
+
+            select: function(info) {
+                // reset form
+                $('#leaveCreateForm')[0].reset();
+                $('#startDate').val(fmt(info.start));
+                $('#endDate').val(moment(info.end).subtract(1,'days').format('YYYY-MM-DD'));
+                $('#isHalfDay').prop('checked', false);
+                $('#startTimeField').hide();
+                $('#endTimeField').hide();
+                $('#halfDayField').show();
+
+                // reset document UI
+                if (documentInput) {
+                    documentInput.value = '';
+                    fileNameDisplay.textContent = '';
+                    documentDetails.style.display = 'none';
+                    dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+                    dropZone.classList.remove('border-blue-500','bg-blue-50');
+                }
+
+                // Leave types
+                $.ajax({
+                    url: '/api/v1/leave/leave-types/',
+                    method: 'GET',
+                    success: function(data) {
+                        let opts = '<option value="" disabled selected>Sélectionner un type</option>';
+                        (data.results || data).forEach(lt => {
+                            opts += `<option value="${lt.id}" data-requires-attachment="${lt.requires_attachment}" data-is-hourly="${lt.is_hourly}">${lt.name}</option>`;
+                        });
+                        $('#leaveType').html(opts);
+                    },
+                    // error: function() { alert('Erreur lors du chargement des types de congé.'); }
+                    error: function(xhr) { showToast(drfMessage(xhr, 'Erreur lors du chargement des types de congé.'), 'error'); }
+
+                });
+
+                // Initialize employee selector (default to current user, fetch list)
+                initEmployeePicker();
+
+                document.getElementById('createEventModal').checked = true;
+            },
+
+            eventDrop: function(info) {
+                const emp = info.event.extendedProps.employee || {};
+                if (userRole === 'EMPLOYEE' && emp?.user?.id == userId && info.event.extendedProps.status === 'pending' && moment(info.event.start).isAfter(moment())) {
+                    $.ajax({
+                        url: `/api/v1/leave/leave/${info.event.id}/`,
+                        type: 'PATCH',
+                        data: JSON.stringify({ start_date: fmt(info.event.start), end_date: moment(info.event.end).subtract(1,'days').format('YYYY-MM-DD') }),
+                        contentType: 'application/json',
+                        headers: { 'X-CSRFToken': getCsrfToken() },
+                        success: function() { calendar.refetchEvents(); },
+                        // error: function() { alert('Erreur lors de la mise à jour.'); info.revert(); }
+                        error: function(xhr) { showToast(drfMessage(xhr, 'Erreur lors de la mise à jour.'), 'error'); info.revert(); }
+
+                    });
+                } else {
+                    info.revert();
+                }
+            }
+        });
+
+        calendar.render();
+
+        // === Document upload UI (drag & drop + filename + details) ===
+        const dropZone         = document.getElementById('dropZone');
+        const documentInput    = document.getElementById('documentInput');
+        const dropZoneText     = document.getElementById('dropZoneText');
+        const fileNameDisplay  = document.getElementById('fileName');
+        const documentDetails  = document.getElementById('documentDetails');
+
+        function updateDocumentUI() {
+            const file = (documentInput.files && documentInput.files[0]) ? documentInput.files[0] : null;
+            if (file) {
+                fileNameDisplay.textContent = `Fichier sélectionné : ${file.name}`;
+                documentDetails.style.display = 'block';
+            } else {
+                fileNameDisplay.textContent = '';
+                documentDetails.style.display = 'none';
+            }
+        }
+
+        // Because the file <input> fully overlays the drop zone, bind to BOTH
+        documentInput.addEventListener('dragover', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            dropZone.classList.add('border-blue-500','bg-blue-50');
+            dropZoneText.textContent = 'Relâchez pour déposer le fichier';
+        }, false);
+
+        documentInput.addEventListener('dragleave', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            dropZone.classList.remove('border-blue-500','bg-blue-50');
+            dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+        }, false);
+
+        documentInput.addEventListener('drop', () => {
+            // DO NOT preventDefault here — let the browser set input.files
+            dropZone.classList.remove('border-blue-500','bg-blue-50');
+            dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+            setTimeout(updateDocumentUI, 0); // reflect the new file
+        }, false);
+
+
+        // Also bind to the container for nicer hover effects (in case the input doesn’t catch it)
+        if (dropZone) {
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500','bg-blue-50'); dropZoneText.textContent = 'Relâchez pour déposer le fichier'; });
+            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('border-blue-500','bg-blue-50'); dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)'; });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-500','bg-blue-50');
+                dropZoneText.textContent = 'Glissez et déposez un fichier ici ou cliquez pour sélectionner (PDF, DOC, JPG, PNG)';
+                if (e.dataTransfer?.files?.length) {
+                    documentInput.files = e.dataTransfer.files;
+                    updateDocumentUI();
+                }
+            });
+        }
+
+        documentInput.addEventListener('change', updateDocumentUI);
+
+        
+        // Toggle hourly/half-day/doc requirements based on leave type
+        $('#leaveType').on('change', function() {
+            const opt = this.options[this.selectedIndex];
+            const isHourly = opt.dataset.isHourly === 'true';
+            const requiresAttachment = opt.dataset.requiresAttachment === 'true';
+            $('#halfDayField').toggle(!isHourly);
+            $('#startTimeField').toggle(isHourly);
+            $('#endTimeField').toggle(isHourly);
+            document.getElementById('documentLabel').textContent = requiresAttachment ? 'Justificatif' : 'Justificatif (facultatif)';
+            document.getElementById('documentInput').required = requiresAttachment;
+            // $('#documentField').toggle(requiresAttachment); // Was hidden for non required leave type
+            $('#documentField').show(); // always visible
+
+        });
+
+        // Helper: turn DRF/jQuery XHR errors into a readable string
+        function drfMessage(xhr, fallback = 'Une erreur est survenue') {
+            try {
+                const data = xhr?.responseJSON || (xhr?.responseText ? JSON.parse(xhr.responseText) : null);
+                if (!data) return fallback;
+                if (typeof data === 'string') return data;
+                if (data.detail) return data.detail;
+                const lines = [];
+                for (const [k, v] of Object.entries(data)) {
+                    if (v == null) continue;
+                    if (Array.isArray(v)) lines.push(`${k}: ${v.join(', ')}`);
+                    else if (typeof v === 'object') lines.push(`${k}: ${JSON.stringify(v)}`);
+                    else lines.push(`${k}: ${v}`);
+                }
+                return lines.join('<br>') || fallback;
+            } catch { return fallback; }
+        }
+
+
+        // Submit (create or update)
+        // Find ContentType id for leave.LeaveRequest (used by Document API)
+        async function fetchLeaveRequestContentType() {
+            try {
+                const resp = await fetch('/api/v1/contenttypes/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+                });
+                const data = await resp.json();
+                const items = data.results || data;
+                const ct = items.find(ct => ct.model === 'leaverequest' && ct.app_label === 'leave');
+                return ct?.id || null;
+            } 
+            catch {
+                return null; 
+            }
+        }
+
+        $('#submitLeaveRequest').on('click', async function (e) {
+            e.preventDefault();
+            const id   = $(this).data('id');
+            const url  = id ? `/api/v1/leave/leave/${id}/` : `/api/v1/leave/leave/`;
+            const method = id ? 'PATCH' : 'POST';
+
+            const formEl  = $('#leaveCreateForm')[0];
+            const formData = new FormData(formEl);
+
+            // required fields you already set
+            const selectedEmployeeId = $('#employeeIdInput').val() || "{{ request.user.employee.id|default:'' }}";
+            const leaveTypeVal = $('#leaveType').val();
+            if (!leaveTypeVal)   { showToast('Veuillez sélectionner un type de congé.', 'error'); return; }
+            if (!selectedEmployeeId) { showToast("Employé introuvable. Réessayez ou contactez l'admin.", 'error'); return; }
+
+            formData.set('leave_type', leaveTypeVal);
+            formData.set('leave_type_id', leaveTypeVal);
+            formData.set('employee', selectedEmployeeId);
+            formData.set('employee_id', selectedEmployeeId);
+
+            // if this leave type requires a document, ensure we have one and upload it first
+            const opt = $('#leaveType')[0].selectedOptions[0];
+            const requiresAttachment = opt?.dataset?.requiresAttachment === 'true';
+
+            const fileInput = document.getElementById('documentInput');
+            const file = fileInput.files[0];
+
+            const file = fileInput.files[0];
+
+            if (requiresAttachment && !file) {
+            showToast('Ce type de congé exige un justificatif. Veuillez joindre un fichier.', 'error');
+            return;
+            }
+            // If a file is provided, enforce document metadata like in my_leave_create.html
+            if (file) {
+                if (!$('#documentType').val()) { showToast('Le type de document est requis.', 'error'); return; }
+                if (!$('#issuanceDate').val()) { showToast("La date d'émission est requise.", 'error'); return; }
+                if (!$('#issuedBy').val())     { showToast('“Émis par” est requis.', 'error'); return; }
+            }
+
+            try {
+                // 1) If there is a file, create the Document first
+                if (file) {
+                const docFD = new FormData();
+                const ctId = await fetchLeaveRequestContentType();
+                if (!ctId) { showToast("Impossible d'obtenir le ContentType pour LeaveRequest.", 'error'); return; }
+
+                // Keys expected by your Document serializer (per my_leave_create.html)
+                docFD.append('file', file);
+                docFD.append('document_type', $('#documentType').val());     // <-- REQUIRED
+                docFD.append('issuance_date', $('#issuanceDate').val() || '');
+                docFD.append('issued_by', $('#issuedBy').val() || '');
+                const txt = $('#contentText').val();
+                if (txt) docFD.append('content_text', txt);
+                docFD.append('status', 'to_validate');
+                docFD.append('content_type', ctId);                          // <-- REQUIRED
+                docFD.append('object_id', '1');                              // temp id; backend will re-link to the leave
+
+                const docResp = await $.ajax({
+                    url: '/api/v1/documents/',
+                    type: 'POST',
+                    data: docFD,
+                    processData: false,
+                    contentType: false,
+                    headers: { 'X-CSRFToken': (document.cookie.split('; ').find(r => r.startsWith('csrftoken='))||'').split('=')[1] }
+                });
+
+                if (docResp?.id) {
+                    // attach the Document to the leave using the field name your API expects
+                    formData.set('document_id', docResp.id);                   // <-- use document_id (not "document")
+                } else {
+                    showToast("Le serveur n'a pas renvoyé d'ID de document.", 'error');
+                    return;
+                }
+                }
+
+                // 2) Create/Update the leave
+                await $.ajax({
+                    url, type: method, data: formData,
+                    processData: false, contentType: false,
+                    headers: { 'X-CSRFToken': (document.cookie.split('; ').find(r => r.startsWith('csrftoken='))||'').split('=')[1] }
+                });
+
+                // success UI
+                showToast('Demande enregistrée avec succès.', 'success');
+                $('#createEventModal').prop('checked', false);
+                $('#createEventModalLabel').text('Nouvelle Demande de Congé');
+                $('#submitLeaveRequest').removeData('id').text('Soumettre');
+                calendar.refetchEvents();
+
+            } catch (xhr) {
+                console.error('Save failed', xhr?.responseText || xhr);
+                showToast(drfMessage(xhr, 'Vérifiez les champs requis'), 'error');
+            }
+        });
+
+
+        // Editing / Deleting / Approvals (unchanged)
+        window.editLeaveRequest = function(id) {
+            $.get(`/api/v1/leave/leave/${id}/`, function(data) {
+                $('#startDate').val(data.start_date);
+                $('#endDate').val(data.end_date);
+                $('#isHalfDay').prop('checked', !!data.is_half_day);
+                $('#startTime').val(data.start_time || '');
+                $('#endTime').val(data.end_time || '');
+                $('#reason').val(data.reason || '');
+
+                const lt = data.leave_type || data.leave_type_detail;
+                $('#leaveType').html(`<option value="${lt.id}" selected>${lt.name}</option>`).trigger('change');
+
+                // prefill employee in selector if present
+                const emp = data.employee || data.employee_detail;
+                if (emp) setSelectedEmployee(emp.id, `${emp.first_name||''} ${emp.last_name||''}`.trim());
+
+                $('#createEventModalLabel').text('Modifier la Demande de Congé');
+                $('#submitLeaveRequest').data('id', id).text('Mettre à Jour');
+                document.getElementById('createEventModal').checked = true;
+            // }).fail(function(){ alert('Erreur lors du chargement.'); });
+            }).fail(function(xhr){ showToast(drfMessage(xhr, 'Erreur lors du chargement.'), 'error'); });
+
+        };
+
+        window.deleteLeaveRequest = function(id) {
+            if (!confirm('Supprimer cette demande de congé ?')) return;
+            $.ajax({
+                url: `/api/v1/leave/leave/${id}/`,
+                type: 'DELETE',
+                headers: { 'X-CSRFToken': getCsrfToken() },
+                // success: function () { calendar.refetchEvents(); document.getElementById('eventModal').checked = false; },
+                success: function () {
+                    calendar.refetchEvents();
+                    document.getElementById('eventModal').checked = false;
+                    showToast('Demande supprimée avec succès.', 'success');
+                },
+                // error: function () { alert('Erreur lors de la suppression.'); }
+                error: function (xhr) { showToast(drfMessage(xhr, 'Erreur lors de la suppression.'), 'error'); }
+
+            });
+        };
+
+        window.approveLeaveRequest = function(id) {
+            $.post({ url: `/api/v1/leave/leave/${id}/approve/`, headers: { 'X-CSRFToken': getCsrfToken() }})
+            // .done(()=>{ calendar.refetchEvents(); document.getElementById('eventModal').checked=false; })
+            // .fail(()=>{ alert('Erreur lors de l’approbation.'); });
+            .done(()=>{
+                calendar.refetchEvents();
+                document.getElementById('eventModal').checked=false;
+                showToast('Demande approuvée avec succès.', 'success');
+            })
+            .fail((xhr)=>{ showToast(drfMessage(xhr, 'Erreur lors de l’approbation.'), 'error'); });
+
+        };
+
+        window.hrApproveLeaveRequest = function(id) {
+            $.post({ url: `/api/v1/leave/leave/${id}/hr_approve/`, headers: { 'X-CSRFToken': getCsrfToken() }})
+            // .done(()=>{ calendar.refetchEvents(); document.getElementById('eventModal').checked=false; })
+            // .fail(()=>{ alert('Erreur lors de l’approbation RH.'); });
+            .done(()=>{ 
+                calendar.refetchEvents(); 
+                document.getElementById('eventModal').checked=false; 
+                showToast('Demande approuvée par RH.', 'success'); 
+            })
+            .fail((xhr)=>{ showToast(drfMessage(xhr, 'Erreur lors de l’approbation RH.'), 'error'); });
+
+        };
+
+        window.rejectLeaveRequest = function(id) {
+            const reason = prompt('Raison du rejet:');
+            if (!reason) return;
+            $.ajax({
+                url: `/api/v1/leave/leave/${id}/`,
+                type: 'PATCH',
+                data: JSON.stringify({ status: 'rejected', rejection_reason: reason }),
+                contentType: 'application/json',
+                headers: { 'X-CSRFToken': getCsrfToken() },
+                // success: function(){ calendar.refetchEvents(); document.getElementById('eventModal').checked=false; },
+                success: function(){
+                    calendar.refetchEvents();
+                    document.getElementById('eventModal').checked=false;
+                    showToast('Demande rejetée avec succès.', 'success');
+                },
+                // error: function(){ alert('Erreur lors du rejet.'); }
+                error: function(xhr){ showToast(drfMessage(xhr, 'Erreur lors du rejet.'), 'error'); }
+            });
+        };
+
+        function showToast(message, type = 'error') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const types = {
+                error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+                success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+            };
+            const toastType = types[type] || types.error;
+            toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+            toast.innerHTML = `
+                <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+                <div class="flex-1"><p class="text-sm font-medium">${message}</p></div>
+                <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            toastContainer.style.zIndex = '9999';
+            toastContainer.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('hide');
+                toast.addEventListener('animationend', () => toast.remove(), { once: true });
+            }, 5000);
+        }
+    });
+</script>
+{% endblock %} 

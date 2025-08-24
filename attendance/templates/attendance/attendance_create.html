@@ -1,0 +1,149 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+{% if user.is_authenticated and user.role in 'ADMIN,HR' or user.is_staff %}
+<div class="container mx-auto px-4 py-6">
+    <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-blue-600 max-w-5xl mx-auto">
+        <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-6">
+            <i class="fas fa-calendar-plus text-blue-600"></i> Ajouter un Enregistrement de Présence
+        </h1>
+        <form id="attendanceCreateForm" class="grid grid-cols-1 gap-6">
+            {% csrf_token %}
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Employé</span></label>
+                <select name="employee_id" id="employeeSelect" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                    <option value="" disabled selected>Sélectionner</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Date</span></label>
+                <input type="date" name="date" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Heure d'Arrivée</span></label>
+                <input type="time" name="check_in" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Heure de Départ</span></label>
+                <input type="time" name="check_out" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text font-semibold text-gray-800">Statut</span></label>
+                <select name="status" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" required>
+                    <option value="present">Présent</option>
+                    <option value="absent">Absent</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button type="submit" class="btn bg-green-500 hover:bg-green-600 text-white">Enregistrer</button>
+                <a href="{% url 'attendance_list' %}" class="btn btn-ghost text-gray-600 hover:bg-gray-100">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% else %}
+<div class="container mx-auto px-4 py-6">
+    <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-red-600">
+        <h3 class="text-lg font-semibold text-gray-800">Accès Refusé</h3>
+        <p class="text-gray-600">Vous n'avez pas la permission d'ajouter des enregistrements.</p>
+    </div>
+</div>
+{% endif %}
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        }
+        return null;
+    }
+    // Load employees for dropdown
+    async function loadEmployees() {
+        try {
+            const response = await fetch('/api/v1/employees/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement des employés');
+            const data = await response.json();
+            const select = document.getElementById('employeeSelect');
+            select.innerHTML = '<option value="" disabled selected>Sélectionner</option>';
+            data.results.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.id;
+                option.textContent = `${emp.first_name} ${emp.last_name}`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading employees:', error);
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+
+    // Submit attendance form
+    async function submitAttendanceForm() {
+        const form = document.getElementById('attendanceCreateForm');
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { data[key] = value || null; });
+
+        try {
+            const response = await fetch('/api/v1/attendance/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                let errorData;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch {
+                    errorData = { error: errorText };
+                }
+                let msg = '';
+                if (errorData.error && typeof errorData.error === 'object') {
+                    msg = Object.entries(errorData.error)
+                        .map(([field, errs]) => `<b>${field}:</b> ${Array.isArray(errs) ? errs.join('<br>') : errs}`)
+                        .join('<br>');
+                } else {
+                    msg = errorData.error || 'Erreur lors de la création de l\'enregistrement.';
+                }
+                showToast(msg, 'error');
+                return;
+            }
+            showToast('Enregistrement créé avec succès!', 'success');
+            setTimeout(() => window.location.href = '{% url 'attendance_list' %}', 1000);
+        } catch (error) {
+            console.error('Error creating record:', error);
+            showToast(`Erreur lors de la création: ${error.message}`, 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadEmployees();
+        const form = document.getElementById('attendanceCreateForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                submitAttendanceForm();
+            });
+        }
+    });
+</script>
+{% endblock %}

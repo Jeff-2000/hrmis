@@ -1,0 +1,644 @@
+{% load static tailwind_tags %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HRMIS - République de Côte d'Ivoire{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    {% tailwind_css %}
+</head>
+<body class="min-h-screen flex flex-col bg-white text-gray-800 font-sans">
+    <!-- Top Navigation Bar -->
+    <nav class="navbar bg-gradient-to-r from-orange-600 via-white to-green-600 text-gray-800 shadow-xl fixed top-0 left-0 right-0 z-50 h-16">
+        <div class="container mx-auto flex justify-between items-center px-4">
+            <div class="flex items-center gap-4">
+                <button class="btn btn-ghost text-gray-800 lg:hidden" id="mobileMenuBtn">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-orange-600 font-bold border border-orange-600">CI</div>
+                    <span class="font-semibold text-lg text-gray-800">HRMIS</span>
+                </div>
+            </div>
+            <!-- User Dropdown -->
+            {% if user.is_authenticated %}
+                <div class="dropdown dropdown-end">
+                    <label tabindex="0" class="btn btn-ghost flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-full px-4 py-2">
+                        <div class="avatar">
+                            <div class="w-9 h-9 rounded-full bg-white flex items-center justify-center text-orange-600 font-bold border border-orange-600">
+                                <i class="fas fa-user"></i>
+                            </div>
+                        </div>
+                        <span class="hidden md:inline text-gray-800">{{ user.username }}</span>
+                        <i class="fas fa-chevron-down text-gray-800"></i>
+                    </label>
+                    <div tabindex="0" class="dropdown-content menu p-2 shadow bg-white rounded-box w-64 mt-2 border border-orange-600">
+                        <div class="p-4 border-b border-gray-200 flex items-center gap-3">
+                            <div class="avatar">
+                                <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center text-orange-600 text-lg border border-orange-600">
+                                    <i class="fas fa-user-shield"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-orange-600 font-semibold">{{ user.username }}</h4>
+                                <p class="text-sm text-gray-600">{{ user.role|default:"Utilisateur" }}</p>
+                            </div> 
+                        </div>
+                        <ul class="menu">
+                            <li><a href="{% url 'profile' %}" class="flex items-center gap-2 py-2 px-4 {% if request.path == '/api/v1/profile/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-100{% endif %}"></i> Mon Profil</a></li>
+                            <li> 
+                                <a href="{% url 'notification_center' %}" class="flex items-center gap-2 py-2 px-4 {% if request.path == '/api/v1/notifications/center/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-100{% endif %}">
+                                <i class="fas fa-bell text-blue-600"></i>
+                                    <span id="notifBadge1"
+                                        class="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5">
+                                    </span>
+                                    Notifications 
+                                </a>
+                            </li>
+                            <li><a href="{% url 'help' %}" class="flex items-center gap-2 py-2 px-4 {% if request.path == '/api/v1/help/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-100{% endif %}"><i class="fas fa-question-circle w-5 text-orange-600"></i> Aide</a></li>
+                            <li class="border-t border-gray-200"><a href="{% url 'logout' %}" class="flex items-center gap-2 py-2 px-4 hover:bg-orange-100"><i class="fas fa-sign-out-alt w-5 text-orange-600"></i> Déconnexion</a></li>
+                        </ul>
+                    </div>
+                </div>
+            {% else %}
+                <div class="flex gap-2">
+                    <a href="{% url 'login' %}" class="btn bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded">Connexion</a>
+                    <a href="{% url 'register' %}" class="btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Inscription</a>
+                </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content Layout -->
+    <div class="flex flex-1 mt-16">
+        <!-- Sidebar Navigation -->
+        {% if user.is_authenticated %}
+            <aside class="sidebar w-64 bg-white shadow-md fixed top-16 left-0 h-[calc(100vh-4rem)] overflow-y-auto transform transition-transform duration-300 lg:translate-x-0 -translate-x-full z-50" id="sidebar">
+                <ul class="menu p-4">
+
+                    <li>
+                        <details class="dropdown">
+                            <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                <i class="fas fa-chart-bar fas fa-tachometer-alt w-6"></i>
+                                <span>Tableau de Bord</span>
+                            </summary>
+                            <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                
+                                <li>
+                                <a href="{% url 'home_dashboard' %}" class="{% if request.path == '/dashboard/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} flex items-center gap-3 py-2 px-4">
+                                    <i class="fas fa-folder w-6 text-orange-600"></i>
+                                    <span>Descriptive</span>
+                                </a>
+                                </li>
+                                
+                                {% if user.is_authenticated and user.role in 'ADMIN,HR' %}
+                                    <li>
+                                        <a href="{% url 'analytics_dashboard' %}" class="{% if request.path == '/api/v1/analytics/dashboard/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} flex items-center gap-3 py-2 px-4">
+                                            <i class="fas fa-chart-line w-6 text-orange-600"></i>
+                                            <span>Predictive</span>
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </details>
+                    </li>
+
+
+                    <li>
+                        <details class="dropdown">
+                            <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                <i class="fas fa-users w-6"></i>
+                                <span>Gestion Employés</span>
+                            </summary>
+                            <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                <li><a href="{% url 'employee_list' %}" class="{% if request.path == '/api/v1/employees/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Liste des Employés</a></li>
+                                {% if user.role in 'ADMIN,HR' %}
+                                    <li><a href="{% url 'employee_create' %}" class="{% if request.path == '/api/v1/employees/create/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Ajouter Employé</a></li>
+                                    <li><a href="{% url 'department_list' %}" class="{% if request.path == '/api/v1/employees/departments/list/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Départements</a></li>
+                                    <li><a href="{% url 'department_create' %}" class="{% if request.path == '/api/v1/employees/departments/create/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Ajouter Departement</a></li>
+                                    <li><a href="{% url 'grade_list' %}" class="{% if request.path == '/api/v1/employees/grades/list/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Grades</a></li>
+                                    <li><a href="{% url 'grade_create' %}" class="{% if request.path == '/api/v1/employees/grades/create/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Ajouter Grade</a></li>
+                                {% endif %}
+                            </ul>
+                        </details>
+                    </li>
+                    <li>
+                        <details class="dropdown">
+                            <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                <i class="fas fa-clock w-6"></i>
+                                <span>Présence</span>
+                            </summary>
+                            <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                <li><a href="{% url 'attendance_list' %}" class="{% if request.path == '/api/v1/attendance/list/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Registre de Présence</a></li>
+                                {% if user.role in 'ADMIN,HR' %}
+                                    <li><a href="{% url 'attendance_dashboard' %}" class="{% if request.path == '/api/v1/attendance/dashboard/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Statistiques</a></li>
+                                    <li><a href="{% url 'attendance_create' %}" class="{% if request.path == '/api/v1/attendance/create/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Ajouter Présence</a></li>
+                                {% endif %}
+                                {% if user.is_authenticated and user.role in 'EMP,ADMIN,HR' %}
+                                    <li><a href="{% url 'my_attendance' %}" class="{% if request.path == '/api/v1/attendance/my/reccord/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Mes Présences</a></li>
+                                {% endif %}
+                            </ul>
+                        </details>
+                    </li>
+                    <li>
+                        <details class="dropdown">
+                            <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                <i class="fas fa-calendar-alt w-6"></i>
+                                <span>Congés</span>
+                            </summary>
+                            <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                <li><a href="{% url 'my_leave_create' %}" class="{% if request.path == '/api/v1/leave/my_create/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Demandez</a></li>
+                                <li><a href="{% url 'my_leave' %}" class="{% if request.path == '/api/v1/leave/my_leave/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Mes Demandes</a></li>
+                                {% if user.is_authenticated and user.role in 'MANAGER,ADMIN,HR' %}
+                                    <li><a href="{% url 'leave_create' %}" class="{% if request.path == '/api/v1/leave/create/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Faire une Demande</a></li>
+                                    <li><a href="{% url 'leave_list' %}" class="{% if request.path == '/api/v1/leave/list/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Demandes de Congé</a></li>
+                                    <li><a href="{% url 'leave_management' %}" class="{% if request.path == '/api/v1/leave/management/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Gestion des Congés</a></li>
+                                {% endif %}
+                                <li><a href="{% url 'leave_calendar' %}" class="{% if request.path == '/api/v1/leave/calendar/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Calendrier</a></li>
+                            </ul> 
+                        </details>
+                    </li>
+                    <li>
+                        <details class="dropdown">
+                            <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                <i class="fas fa-file-alt w-6"></i>
+                                <span>Situations Admin.</span>
+                            </summary>
+                            <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                <li><a href="{% url 'my_situation' %}" class="{% if request.path == '/api/v1/situations/me/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Mes Situations</a></li>
+                                {% if request.user.role in 'ADMIN,HR'%}
+                                <li><a href="{% url 'situation_current' %}" class="{% if request.path == '/api/v1/situations/current/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Situations Actuelles</a></li>
+                                <li><a href="{% url 'situation_history' %}" class="{% if request.path == '/api/v1/situations/history/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Historique</a></li>
+                                {% endif %}
+                            </ul>
+                        </details>
+                    </li>
+
+                    <li>
+                    <details class="dropdown">
+                        <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                        <i class="fas fa-money-check w-6"></i>
+                        <span>Paie</span>
+                        </summary>
+                        <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                        <li>
+                            <a href="{% url 'payroll_dashboard' %}"
+                            class="{% if request.path == '/api/v1/payroll/dashboard/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-chart-line w-5 text-orange-600"></i> Tableau de bord
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'payroll_list' %}"
+                            class="{% if request.path == '/api/v1/payroll/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-layer-group w-5 text-orange-600"></i> Lots mensuels
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'payroll_calendar' %}"
+                            class="{% if request.path == '/api/v1/payroll/calendar/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-calendar-alt w-5 text-orange-600"></i> Calendrier
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'payroll_variables' %}"
+                            class="{% if request.path == '/api/v1/payroll/variables/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-sliders-h w-5 text-orange-600"></i> Variables
+                            </a>
+                        </li>
+
+                        {# Self-service: my payslips #}
+                        {% if user.is_authenticated and user.role in 'EMP,ADMIN,HR' %}
+                        <li>
+                            <a href="{% url 'my_payslips' %}"
+                            class="{% if request.path == '/api/v1/payroll/me/payslips/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-file-invoice-dollar w-5 text-orange-600"></i> Mes bulletins
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {# Self compensation profile #}
+                        {% if user.is_authenticated and user.role in 'EMP,ADMIN,HR' %}
+                        <li>
+                            <a href="{% url 'payroll_employee_compensation' employee_id='me' %}"
+                            class="{% if request.path == '/api/v1/payroll/employee/me/compensation/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-user-tie w-5 text-orange-600"></i> Mon profil de rémunération
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {# Payroll settings (HR/ADMIN only) #}
+                        {% if user.role in 'ADMIN,HR' %}
+
+                        <li>
+                        <a href="{% url 'payroll_all_payslips' %}"
+                            class="{% if request.path == '/api/v1/payroll/payslips/all/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} flex items-center gap-3 py-2 px-4">
+                            <i class="fas fa-list w-6 text-orange-600"></i>
+                            <span>Tous les bulletins</span>
+                        </a>
+                        </li>
+
+                        <li class="menu-title px-4 pt-3 text-xs uppercase text-gray-500">Réglages</li>
+                        <li>
+                            <a href="{% url 'payroll_settings_policies' %}"
+                            class="{% if request.path == '/api/v1/payroll/settings/policies/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-building w-5 text-orange-600"></i> Politiques
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'payroll_settings_components' %}"
+                            class="{% if request.path == '/api/v1/payroll/settings/components/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-puzzle-piece w-5 text-orange-600"></i> Composants
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'payroll_settings_tax' %}"
+                            class="{% if request.path == '/api/v1/payroll/settings/tax/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-percent w-5 text-orange-600"></i> Impôts
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'payroll_settings_contribs' %}"
+                            class="{% if request.path == '/api/v1/payroll/settings/contribs/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-hand-holding-usd w-5 text-orange-600"></i> Contributions
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'payroll_settings_fx' %}"
+                            class="{% if request.path == '/api/v1/payroll/settings/fx/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">
+                            <i class="fas fa-exchange-alt w-5 text-orange-600"></i> Taux de change
+                            </a>
+                        </li>
+                        {% endif %}
+                        </ul>
+                    </details>
+                    </li>
+
+                    <li>
+                        <details class="dropdown">
+                            <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                <i class="fas fa-file-contract w-6"></i> <!-- only in FA Pro -->
+                                <span>Contrats</span>
+                            </summary>
+                            <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                {% if user.is_authenticated and user.role in 'ADMIN,HR' %}
+                                <li>
+                                <a href="{% url 'contracts_admin' %}" class="{% if request.path == '/api/v1/payroll/contracts/' %}bg-orange-100 text-green-600{% else %} hover:bg-orange-50 {% endif %} flex items-center gap-3 py-2 px-4 ">
+                                    <i class="fas fa-file-signature w-6 text-orange-600"></i>
+                                    <span>Tous les contrats</span>
+                                </a>
+                                </li>
+                                {% endif %}
+                                <li>
+                                <a href="{% url 'contracts_my' %}" class="{% if request.path == '/api/v1/payroll/contracts/my/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} flex items-center gap-3 py-2 px-4">
+                                    <i class="fas fa-file-contract w-6 text-orange-600"></i>
+                                    <span>Mes contrats</span>
+                                </a>
+                                </li>
+                            </ul>
+                        </details>
+                    </li>
+
+                    <li>
+                        <details class="dropdown">
+                            <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                <i class="fas fa-file-contract w-6"></i> <!-- only in FA Pro -->
+                                <span>Documents</span>
+                            </summary>
+                            <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                {% if user.is_authenticated and user.role in 'ADMIN,HR' %}
+                                <li>
+                                <a href="{% url 'document_list' %}" class="{% if request.path == '/api/v1/documents/list/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} flex items-center gap-3 py-2 px-4">
+                                    <i class="fas fa-folder w-6 text-orange-600"></i>
+                                    <span>Tous</span>
+                                </a>
+                                </li>
+                                {% endif %}
+                                <li>
+                                <a href="{% url 'document_my' %}" class="{% if request.path == '/api/v1/documents/my/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} flex items-center gap-3 py-2 px-4">
+                                    <i class="fas fa-folder w-6 text-orange-600"></i>
+                                    <span>Mes Documents</span>
+                                </a>
+                                </li>
+                            </ul>
+                        </details>
+                    </li>
+
+                    <li>
+                    <a href="{% url 'notification_center' %}" 
+                        class="{% if request.path == '/api/v1/notifications/center/' %}
+                                bg-orange-100 border-l-4 border-orange-600 text-green-600
+                                {% else %}
+                                hover:bg-orange-50
+                                {% endif %}
+                                flex items-center gap-3 py-2 px-4">
+                        
+                        <i class="fas fa-bell w-6 text-orange-600"></i>
+                        
+                        <span class="flex items-center gap-2">
+                            Notifications
+                            <span id="notifBadge2"
+                            class="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5">
+                            3
+                            </span>
+                        </span>
+                    </a>
+                    </li>
+
+                    <!-- System Settings Section -->
+                    {% if user.role in 'ADMIN,HR' %}
+                        <div class="mt-auto pt-4 border-t border-gray-200">
+                            <div class="text-xs uppercase text-gray-500 font-semibold px-4 mb-2">Administration</div>
+                            <details class="dropdown">
+                                <summary class="flex items-center gap-3 py-2 px-4 hover:bg-orange-50 cursor-pointer text-orange-600">
+                                    <i class="fas fa-cogs w-6"></i>
+                                    <span>Paramètres Système</span>
+                                </summary>
+                                <ul class="menu dropdown-content bg-white rounded-box border-l-2 border-orange-600">
+                                    <li><a href="{% url 'audit_index_view' %}" class="{% if request.path == '/api/v1/audit/index/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Journal d'Audit</a></li>
+                                    <li><a href="{% url 'notification_settings' %}" class="{% if request.path == '/api/v1/settings/notifications/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Param. Notifications</a></li>
+                                    <li><a href="{% url 'profile' %}" class="{% if request.path == '/api/v1/profile/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Mon Profil</a></li>
+                                    <li class="border-t"> <a href="{% url 'logout' %}" class="{% if request.path == '/accounts/logout/' %}bg-orange-100 text-green-600{% else %}hover:bg-orange-50{% endif %} py-2 px-4">Déconnexion</a></li>
+
+                                    {% if user.is_authenticated and user.is_staff %}
+                                    <li class="mt-2 border-t border-gray-300">
+                                        <a href="/admin/"
+                                            class="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-orange-50 to-orange-100 
+                                                    hover:from-orange-100 hover:to-orange-200 
+                                                    text-gray-700 font-semibold rounded-b-lg shadow-sm">
+                                            <span class="text-sm uppercase tracking-wide">⚙️ Système</span>
+                                            <span class="text-xs text-gray-500">Accès global</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </details>
+                        </div>
+                    {% endif %}
+                </ul>
+            </aside>
+        {% endif %}
+
+        <!-- Main Content Area -->
+        <main class="flex-1 lg:ml-64 p-6 transition-all duration-300 bg-white z-40" id="contentArea">
+            {% block content %}
+                <div class="card bg-white shadow-xl p-6 border-l-4 border-orange-600">
+                    <h1 class="text-2xl font-bold text-orange-600">Bienvenue sur HRMIS</h1>
+                    <p class="text-gray-600">Système de Gestion des Ressources Humaines de la République de Côte d'Ivoire</p>
+                </div>
+            {% endblock %}
+        </main>
+    </div>
+
+    <script>
+        // Grab csrftoken from cookie (Django default cookie name)
+        function getCookie(name){
+            const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return m ? m.pop() : '';
+        }
+        const CSRF = getCookie('csrftoken');
+
+        // Wrapper that always sends CSRF + same-origin cookies
+        async function csrfFetch(url, opts={}){
+            const headers = Object.assign(
+            {'X-Requested-With':'XMLHttpRequest','X-CSRFToken': CSRF},
+            (opts.headers||{})
+            );
+            return fetch(url, Object.assign({credentials:'same-origin'}, opts, {headers}));
+        }
+        window.csrfFetch = csrfFetch;
+    </script>
+
+    <script>
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('translate-x-0');
+            sidebar.classList.toggle('-translate-x-full');
+        });
+
+        // Responsive adjustments
+        function handleResize() {
+            if (window.innerWidth > 1024) {
+                sidebar.classList.remove('translate-x-0');
+                sidebar.classList.add('-translate-x-full');
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+
+        // Dropdown toggle with exclusive opening
+        const dropdowns = document.querySelectorAll('.dropdown');
+        dropdowns.forEach(dropdown => {
+            const summary = dropdown.querySelector('summary');
+            if (summary) {
+                summary.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    dropdowns.forEach(otherDropdown => {
+                        if (otherDropdown !== dropdown) {
+                            otherDropdown.removeAttribute('open');
+                        }
+                    });
+                    dropdown.toggleAttribute('open');
+                });
+            }
+        });
+
+
+        // Toast notification function
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-end ${type === 'success' ? 'bg-green-600' : 'bg-red-600'} fixed bottom-8 right-8 p-4 rounded-lg text-white shadow-xl`;
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Modal functions
+        function showModal(content) {
+            const modal = document.createElement('div');
+            modal.className = 'modal modal-open';
+            modal.innerHTML = `
+                <div class="modal-box bg-white border-l-4 border-orange-600">
+                    <button class="btn btn-sm btn-circle absolute right-2 top-2 bg-orange-600 text-white hover:bg-orange-700" onclick="closeModal()">✕</button>
+                    ${content}
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function closeModal() {
+            const modal = document.querySelector('.modal');
+            if (modal) modal.remove();
+        }
+    </script>
+
+    {% comment %} <script>
+        (async function notifBadgePoll(){
+        async function refresh(){
+            try{
+            const r = await fetch('/api/v1/notifications/notifications/unread_count/', {headers:{'X-Requested-With':'XMLHttpRequest'}});
+            const d = await r.json();
+            const el = document.getElementById('notifBadge');
+            if(!el) return;
+            const n = d.unread || 0;
+            el.textContent = n ? n : '';
+            el.style.display = n ? 'inline-block' : 'none';
+            }catch(e){ /* ignore */ }
+        }
+        await refresh();
+        setInterval(refresh, 30000); // refresh every 30s
+        })();
+    </script> {% endcomment %}
+
+    <script>
+        (async function notifBadgePoll(){
+            async function refresh(){
+                try {
+                    const r = await fetch('/api/v1/notifications/notifications/unread_count/', {
+                        headers: {'X-Requested-With':'XMLHttpRequest'}
+                    });
+                    const d = await r.json();
+                    const n = d.unread || 0;
+
+                    // Update both badges
+                    const badge1 = document.getElementById('notifBadge1');
+                    const badge2 = document.getElementById('notifBadge2');
+
+                    [badge1, badge2].forEach(el => {
+                        if (!el) return;
+                        el.textContent = n ? n : '';
+                        el.style.display = n ? 'inline-block' : 'none';
+                    });
+                } catch(e) {
+                    console.error('Error fetching unread notifications:', e);
+                }
+            }
+
+            await refresh();
+            setInterval(refresh, 30000); // refresh every 30s
+        })();
+    </script>
+
+    <!-- Begin of Designer Info -->
+    <!-- Floating button -->
+    <button id="designerFab"
+    class="fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-blue-600 text-white shadow-xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
+    aria-label="À propos du concepteur" title="À propos du concepteur">
+    <i class="fa-solid fa-id-badge text-lg"></i>
+    </button>
+
+    <!-- Modal -->
+    <div id="designerModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" data-close="1"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4">
+        <div class="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-blue-100 overflow-hidden animate-[fadeIn_.2s_ease]">
+        <div class="relative h-28 bg-gradient-to-r from-blue-600 via-blue-500 to-orange-500"></div>
+        <button class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white text-gray-700 shadow hover:bg-gray-50"
+                aria-label="Fermer" data-close="1">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="px-6 -mt-12 flex items-end gap-4">
+            <img id="dAvatar" class="w-20 h-20 rounded-2xl ring-4 ring-white object-cover shadow-lg z-10" alt="Avatar">
+            <div class="pb-2">
+            <div id="dName" class="relative text-xl font-extrabold text-white z-20"></div>
+
+            <div id="dTitle" class="text-sm text-blue-700/80"></div>
+            </div>
+        </div>
+
+        <div class="px-6 pt-4 text-gray-700">
+            <p id="dBio" class="leading-relaxed"></p>
+            <div class="mt-4 grid sm:grid-cols-2 gap-3 text-sm">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-envelope text-blue-600"></i><a id="dEmail" class="hover:underline break-all"></a></div>
+            <div class="flex items-center gap-2"><i class="fa-solid fa-phone text-blue-600"></i><a id="dPhone" class="hover:underline"></a></div>
+            <div class="flex items-center gap-2"><i class="fa-solid fa-globe text-blue-600"></i><a id="dWebsite" class="hover:underline break-all" target="_blank" rel="noopener"></a></div>
+            </div>
+
+            <div class="mt-5">
+            <div class="text-xs uppercase font-semibold text-gray-500 tracking-wider mb-2">Réseaux</div>
+            <div class="flex flex-wrap gap-3">
+                <a id="sLinkedin" target="_blank" rel="noopener" class="icon-btn" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
+                <a id="sGithub" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+                <a id="sX" target="_blank" rel="noopener" class="icon-btn" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+                <a id="sFacebook" target="_blank" rel="noopener" class="icon-btn" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+                <a id="sInstagram" target="_blank" rel="noopener" class="icon-btn" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+                <a id="sWhatsapp" target="_blank" rel="noopener" class="icon-btn" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+                <a id="sEmail" class="icon-btn" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+            </div>
+            </div>
+
+            <div class="px-1 py-5 text-xs text-gray-500">
+            Conçu avec ❤️ pour moderniser la GRH.
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Designer Info Widget (global) -->
+    <script>
+        // --- Customize me ---
+        window.DESIGNER_INFO = {
+            name: "Jeff Pierre",
+            title: "Concepteur & Développeur du système",
+            email: "jeffpierre720@gmail.com",
+            phone: "+2250700000000",
+            website: "https://votre-domaine.com",
+            avatar: "{% static 'img/designer-avatar.jpg' %}",   // put your photo in static files
+            bio: " Jeff Pierre is a statistician and data scientist with expertise in analytics, modeling, and economic research. He holds a MicroMasters in Statistics and Data Science from MITx and has worked on projects in geospatial analysis, predictive modeling, finance, and NLP. Skilled in Python, R, and SQL, Jeff is passionate about applying data to public policy and innovation, and he actively contributes to tech and AI communities.",
+            socials: {
+            linkedin: "https://www.linkedin.com/in/votre-profil/",
+            github: "https://github.com/votre-profil",
+            x: "https://x.com/votre-profil",
+            facebook: "https://facebook.com/votre.profil",
+            instagram: "https://instagram.com/votre.profil",
+            whatsapp: "https://wa.me/2250700000000",
+            email: "mailto:jeffpierre720@gmail.com"
+            }
+        };
+    </script>
+
+    <style>
+    .icon-btn{ @apply w-10 h-10 grid place-content-center rounded-full border border-blue-200 text-blue-700 bg-white hover:bg-blue-50; }
+    @keyframes fadeIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+    </style>
+
+    <script>
+    (function(){
+    const cfg = window.DESIGNER_INFO || {};
+    const $ = (id)=>document.getElementById(id);
+
+    // Fill content
+    $("dAvatar").src      = cfg.avatar || "https://ui-avatars.com/api/?name="+encodeURIComponent(cfg.name||"Designer")+"&background=2563eb&color=fff";
+    $("dName").textContent= cfg.name || "Designer";
+    $("dTitle").textContent= cfg.title || "";
+    $("dBio").textContent = cfg.bio || "";
+    $("dEmail").textContent = cfg.email || ""; $("dEmail").href = cfg.socials?.email || (cfg.email ? "mailto:"+cfg.email : "#");
+    $("dPhone").textContent = cfg.phone || ""; $("dPhone").href = cfg.phone ? "tel:"+cfg.phone : "#";
+    $("dWebsite").textContent = cfg.website || ""; $("dWebsite").href = cfg.website || "#";
+
+    const link = (id, key) => { const el=$(id); const url=cfg.socials?.[key]; if(url){ el.href=url; } else { el.classList.add("pointer-events-none","opacity-40"); } };
+    link("sLinkedin","linkedin"); link("sGithub","github"); link("sX","x");
+    link("sFacebook","facebook"); link("sInstagram","instagram"); link("sWhatsapp","whatsapp"); link("sEmail","email");
+
+    const fab = $("designerFab"), modal = $("designerModal");
+    const open = ()=>{ modal.classList.remove("hidden"); modal.setAttribute("aria-hidden","false"); };
+    const close = ()=>{ modal.classList.add("hidden"); modal.setAttribute("aria-hidden","true"); };
+
+    fab.addEventListener("click", open);
+    modal.addEventListener("click", (e)=>{ if(e.target.dataset.close) close(); });
+    document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") close(); });
+    })();
+    </script>
+    <!-- Done Designer Info -->
+
+    {% block extra_js %}
+    {% endblock %}
+</body>
+</html>

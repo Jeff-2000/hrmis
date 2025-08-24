@@ -1,0 +1,448 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-calendar-alt text-blue-600"></i> Gestion des Congés
+    </h1>
+
+    <!-- Unread Count -->
+    <div class="mb-6">
+        <span id="unreadCount" class="badge bg-red-500 text-white text-lg px-4 py-2">0 demandes non lues</span>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Plage de Dates</span></label>
+            <input type="text" id="dateRange" class="input input-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" placeholder="Sélectionner les dates" />
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Employé</span></label>
+            <select id="employeeFilter" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="">Tous les employés</option>
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Type de Congé</span></label>
+            <select id="leaveTypeFilter" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="">Tous les types</option>
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text font-semibold text-gray-800">Statut</span></label>
+            <select id="statusFilter" class="select select-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="">Tous les statuts</option>
+                <option value="pending">En attente</option>
+                <option value="manager_approved">Approuvé par le manager</option>
+                <option value="hr_approved">Approuvé par HR</option>
+                <option value="rejected">Rejeté</option>
+                <option value="taken">Pris</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container bg-white shadow-xl rounded-lg border-l-4 border-blue-600">
+        <div class="table-header flex justify-between items-center p-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list mr-2"></i> Demandes de Congé</h3>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-3 px-4 text-left text-gray-800">Employé</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Type de Congé</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Date de Début</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Date de Fin</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Durée</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Statut</th>
+                    <th class="py-3 px-4 text-left text-gray-800">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="leaveTable"></tbody>
+        </table>
+        <div id="pagination" class="flex justify-between items-center p-4">
+            <div>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="prevPage" disabled>Précédent</button>
+                <span id="pageInfo" class="text-gray-600"></span>
+                <button class="btn bg-gray-500 hover:bg-gray-600 text-white" id="nextPage">Suivant</button>
+            </div>
+            <select id="pageSize" class="select select-bordered border-blue-500 focus:border-blue-600 bg-white text-gray-800">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs pointer-events-none"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.9/dist/flatpickr.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.9/dist/flatpickr.min.css">
+<script>
+    let currentPage = 1;
+    let pageSize = 10;
+    let filters = { date_range: '', employee_id: '', leave_type_id: '', status: '', is_read: '' };
+
+    function safeGet(obj, path, defaultValue = '') {
+        try {
+            return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : defaultValue, obj);
+        } catch (e) {
+            return defaultValue;
+        }
+    }
+
+    function getCsrfToken() {
+        const name = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        }
+        return null;
+    }
+
+    function showToast(message, type = 'error') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const types = {
+            error: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', icon: 'fa-exclamation-circle text-red-600' },
+            success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', icon: 'fa-check-circle text-green-600' }
+        };
+        const toastType = types[type] || types.error;
+        toast.className = `toast ${toastType.bg} ${toastType.text} border-l-4 ${toastType.border} p-4 rounded-md shadow-lg flex items-start pointer-events-auto mb-2`;
+        toast.innerHTML = `
+            <i class="fas ${toastType.icon} mt-1 mr-3"></i>
+            <div class="flex-1"><p class="text-sm font-medium">${message}</p></div>
+            <button class="ml-2 text-gray-500 hover:text-gray-700" onclick="this.closest('.toast').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        }, 5000);
+    }
+
+    // Initialize date picker
+    flatpickr('#dateRange', {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        onChange: function(selectedDates) {
+            if (selectedDates.length === 2) {
+                filters.date_range = `${selectedDates[0].toISOString().split('T')[0]} to ${selectedDates[1].toISOString().split('T')[0]}`;
+                currentPage = 1;
+                loadLeaves();
+            }
+        }
+    });
+
+    async function loadFilters() {
+        try {
+            const empResponse = await fetch('/api/v1/employees/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!empResponse.ok) throw new Error('Erreur lors du chargement des employés');
+            const empData = await empResponse.json();
+            const empSelect = document.getElementById('employeeFilter');
+            empData.results.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.id;
+                option.textContent = `${emp.first_name} ${emp.last_name}`;
+                empSelect.appendChild(option);
+            });
+
+            const leaveTypeResponse = await fetch('/api/v1/leave/leave-types/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!leaveTypeResponse.ok) throw new Error('Erreur lors du chargement des types de congé');
+            const leaveTypeData = await leaveTypeResponse.json();
+            const leaveTypeSelect = document.getElementById('leaveTypeFilter');
+            const leaveTypes = leaveTypeData.results || leaveTypeData;
+            leaveTypes.forEach(lt => {
+                const option = document.createElement('option');
+                option.value = lt.id;
+                option.textContent = lt.name;
+                leaveTypeSelect.appendChild(option);
+            });
+
+            empSelect.addEventListener('change', () => {
+                filters.employee_id = empSelect.value;
+                currentPage = 1;
+                loadLeaves();
+            });
+            leaveTypeSelect.addEventListener('change', () => {
+                filters.leave_type_id = leaveTypeSelect.value;
+                currentPage = 1;
+                loadLeaves();
+            });
+            document.getElementById('statusFilter').addEventListener('change', () => {
+                filters.status = document.getElementById('statusFilter').value;
+                currentPage = 1;
+                loadLeaves();
+            });
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+
+    async function loadUnreadCount() {
+        try {
+            const response = await fetch('/api/v1/leave/leave/?is_read=false', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error('Erreur lors du chargement du compte non lu');
+            const data = await response.json();
+            document.getElementById('unreadCount').textContent = `${data.count} demandes non lues`;
+        } catch (error) {
+            showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+
+    function escapeHtml(string) {
+        if (typeof string !== 'string') return '';
+        return string
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function formatDateForDisplay(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d)) return dateStr;
+        return d.toLocaleDateString('fr-FR');
+    }
+
+    async function loadLeaves() {
+        const tbody = document.getElementById('leaveTable');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
+        try {
+            const query = new URLSearchParams({
+                page: currentPage,
+                page_size: pageSize,
+                date_range: filters.date_range || '',
+                employee_id: filters.employee_id || '',
+                leave_type_id: filters.leave_type_id || '',
+                status: filters.status || ''
+            }).toString();
+            const response = await fetch(`/api/v1/leave/leave/?${query}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            const data = await response.json();
+            tbody.innerHTML = data.results.map(record => {
+                const employeeName = `${safeGet(record, 'employee.first_name', '')} ${safeGet(record, 'employee.last_name', '')}`.trim() || 'Unknown';
+                const leaveType = safeGet(record, 'leave_type.name', 'Unknown');
+                const startDate = formatDateForDisplay(safeGet(record, 'start_date'));
+                const endDate = formatDateForDisplay(safeGet(record, 'end_date'));
+                const duration = record.is_half_day ? 'Demi-journée' : record.duration_hours ? `${record.duration_hours} heures` : `${record.calculate_working_days || 'N/A'} jours`;
+                const status = safeGet(record, 'status', 'pending');
+                const statusBadge = {
+                    'pending': 'bg-yellow-500',
+                    'manager_approved': 'bg-blue-500',
+                    'hr_approved': 'bg-green-500',
+                    'rejected': 'bg-red-500',
+                    'taken': 'bg-gray-500'
+                }[status] || 'bg-gray-500';
+                const rowStyle = record.is_read ? '' : 'font-bold bg-blue-50';
+
+                return `
+                    <tr class="${rowStyle} hover:bg-blue-100 border-b border-gray-200">
+                        <td class="py-3 px-4">${escapeHtml(employeeName)}</td>
+                        <td class="py-3 px-4">${escapeHtml(leaveType)}</td>
+                        <td class="py-3 px-4">${escapeHtml(startDate)}</td>
+                        <td class="py-3 px-4">${escapeHtml(endDate)}</td>
+                        <td class="py-3 px-4">${escapeHtml(duration)}</td>
+                        <td class="py-3 px-4">
+                            <span class="badge ${statusBadge} text-white">
+                                ${status === 'pending' ? 'En attente' : 
+                                  status === 'manager_approved' ? 'Approuvé par manager' : 
+                                  status === 'hr_approved' ? 'Approuvé par HR' : 
+                                  status === 'rejected' ? 'Rejeté' : 'Pris'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="flex gap-2">
+                                <button class="btn btn-sm bg-blue-400 hover:bg-blue-500 text-white" title="Voir" onclick="viewRecord(${record.id})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm bg-green-500 hover:bg-green-600 text-white" title="Approuver" onclick="approveRecord(${record.id})">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-sm bg-red-500 hover:bg-red-600 text-white" title="Rejeter" onclick="rejectRecord(${record.id})">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('') || '<tr><td colspan="7" class="text-center py-4 text-gray-500">Aucune demande trouvée.</td></tr>';
+            const totalPages = Math.ceil(data.count / pageSize);
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} sur ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+            loadUnreadCount();
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-red-500 py-4 text-center">Erreur: ${error.message}</td></tr>`;
+            showToast(`Erreur lors du chargement: ${error.message}`, 'error');
+        }
+    }
+
+    async function viewRecord(id) {
+        try {
+            const response = await fetch(`/api/v1/leave/leave/${id}/`, {
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            const r = await response.json();
+            const duration = r.is_half_day ? 'Demi-journée' : r.duration_hours ? `${r.duration_hours} heures` : `${r.calculate_working_days || 'N/A'} jours`;
+            openModal(`
+                <div class="mb-4 flex items-center gap-3">
+                    <i class="fas fa-user text-2xl text-blue-500"></i>
+                    <span class="font-bold text-lg text-gray-800">${escapeHtml(safeGet(r, 'employee.first_name'))} ${escapeHtml(safeGet(r, 'employee.last_name'))}</span>
+                </div>
+                <div class="grid grid-cols-1 gap-3">
+                    <div><span class="font-semibold text-gray-600">Type de Congé:</span> ${escapeHtml(safeGet(r, 'leave_type.name'))}</div>
+                    <div><span class="font-semibold text-gray-600">Date de Début:</span> ${formatDateForDisplay(r.start_date)}</div>
+                    <div><span class="font-semibold text-gray-600">Date de Fin:</span> ${formatDateForDisplay(r.end_date)}</div>
+                    <div><span class="font-semibold text-gray-600">Durée:</span> ${escapeHtml(duration)}</div>
+                    <div><span class="font-semibold text-gray-600">Raison:</span> ${escapeHtml(r.reason || 'Aucune')}</div>
+                    <div>
+                        <span class="font-semibold text-gray-600">Statut:</span>
+                        <span class="badge ${r.status === 'pending' ? 'bg-yellow-500' : r.status === 'manager_approved' ? 'bg-blue-500' : r.status === 'hr_approved' ? 'bg-green-500' : r.status === 'rejected' ? 'bg-red-500' : 'bg-gray-500'} text-white px-2 ml-2">
+                            ${r.status === 'pending' ? 'En attente' : 
+                              r.status === 'manager_approved' ? 'Approuvé par manager' : 
+                              r.status === 'hr_approved' ? 'Approuvé par HR' : 
+                              r.status === 'rejected' ? 'Rejeté' : 'Pris'}
+                        </span>
+                    </div>
+                    <div><span class="font-semibold text-gray-600">Document:</span> ${r.document && r.document.file ? `<a href="${r.document.file.url}" target="_blank">Voir</a>` : 'Aucun'}</div>
+                </div>
+                <div class="flex justify-end mt-6">
+                    <button class="btn bg-blue-500 hover:bg-blue-600 text-white" onclick="document.querySelector('.daisy-modal').remove()">Fermer</button>
+                </div>
+            `);
+            loadLeaves();
+        } catch (error) {
+            showToast(`Erreur lors du chargement: ${error.message}`, 'error');
+        }
+    }
+
+    async function approveRecord(id) {
+        try {
+            const response = await fetch(`/api/v1/leave/leave/${id}/approve/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            showToast('Demande approuvée avec succès!', 'success');
+            loadLeaves();
+        } catch (error) {
+            showToast(`Erreur lors de l'approbation: ${error.message}`, 'error');
+        }
+    }
+
+    async function rejectRecord(id) {
+        openModal(`
+            <div class="flex flex-col items-center p-2">
+                <div class="mb-3 text-red-600 text-3xl"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="font-semibold text-lg mb-1 text-gray-800">Confirmer le Rejet</div>
+                <div class="text-gray-600 mb-4">Êtes-vous sûr de vouloir rejeter cette demande de congé ?</div>
+                <form id="rejectLeaveForm" class="w-full">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-semibold text-gray-800">Raison du rejet</span></label>
+                        <textarea name="rejection_reason" class="textarea textarea-bordered w-full border-blue-500 focus:border-blue-600 bg-white text-gray-800" placeholder="Entrez la raison du rejet"></textarea>
+                    </div>
+                </form>
+                <div class="flex gap-2 justify-end w-full mt-4">
+                    <button class="btn bg-red-500 hover:bg-red-600 text-white" onclick="submitRejectRecord(${id})">Rejeter</button>
+                    <button class="btn btn-ghost text-gray-600 hover:bg-gray-200" onclick="document.querySelector('.daisy-modal').remove()">Annuler</button>
+                </div>
+            </div>
+        `);
+    }
+
+    async function submitRejectRecord(id) {
+        const form = document.getElementById('rejectLeaveForm');
+        const formData = new FormData(form);
+        const data = { status: 'rejected', rejection_reason: formData.get('rejection_reason') || 'Aucune raison spécifiée' };
+        try {
+            const response = await fetch(`/api/v1/leave/leave/${id}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
+            document.querySelector('.daisy-modal').remove();
+            showToast('Demande rejetée avec succès!', 'success');
+            loadLeaves();
+        } catch (error) {
+            showToast(`Erreur lors du rejet: ${error.message}`, 'error');
+        }
+    }
+
+    function openModal(html) {
+        document.querySelectorAll('.daisy-modal').forEach(m => m.remove());
+        const modal = document.createElement('div');
+        modal.className = "daisy-modal fixed inset-0 flex items-center justify-center z-50 bg-black/40";
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg shadow-2xl max-w-lg w-full p-6 relative animate-fade-in">
+                <button class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl" onclick="this.closest('.daisy-modal').remove()"><i class="fas fa-times"></i></button>
+                ${html}
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => {
+            const focusable = modal.querySelector("button, input, select, textarea, [tabindex]");
+            if (focusable) focusable.focus();
+        }, 100);
+    }
+
+    function changePage(delta) {
+        currentPage += delta;
+        loadLeaves();
+    }
+
+    function updatePageSize() {
+        pageSize = parseInt(document.getElementById('pageSize').value);
+        currentPage = 1;
+        loadLeaves();
+    }
+
+    document.getElementById('prevPage').addEventListener('click', () => changePage(-1));
+    document.getElementById('nextPage').addEventListener('click', () => changePage(1));
+    document.getElementById('pageSize').addEventListener('change', updatePageSize);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadFilters();
+        loadLeaves();
+        loadUnreadCount();
+    });
+</script>
+{% endblock %}
