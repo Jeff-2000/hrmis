@@ -20,3 +20,14 @@ class EmployeeAdmin(admin.ModelAdmin):
     search_fields = ('last_name', 'first_name', 'contact', 'position')
     autocomplete_fields = ['grade', 'department', 'user']
     
+@admin.register(Region)
+class RegionAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "quota", "active")
+    search_fields = ("code", "name")
+    list_filter = ("active",)
+
+@admin.register(Worksite)
+class WorksiteAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "region", "department", "active")
+    search_fields = ("code", "name")
+    list_filter = ("active", "region", "department")

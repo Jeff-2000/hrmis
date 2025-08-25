@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import *
+from .admin_extra import *
 
 @admin.register(AttendanceRecord)
 class AttendanceRecordAdmin(admin.ModelAdmin):

@@ -1,5 +1,6 @@
 # attendance/models.py
 from django.db import models
+from .models_extra import *
 from django.utils import timezone
 import datetime
 

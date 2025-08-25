@@ -14,122 +14,61 @@
 
     <!-- Daily Overview -->
     <div id="dashboardGrid" class="dashboard-grid grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 hidden">
-        <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 border-l-4 border-green-600">
-            <div class="flex items-center gap-4">
-                <div class="bg-green-500 text-white rounded-full p-3">
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-green-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-green-500 text-white rounded-full p-3">
                     <i class="fas fa-user-check"></i>
                 </div>
                 <div>
-                    <h3 class="text-base sm:text-lg font-semibold text-gray-800">Présents</h3>
-                    <div class="text-xl sm:text-2xl font-bold text-green-600" id="presentCount">0</div>
-                    <div class="text-gray-600 text-xs sm:text-sm">Aujourd'hui</div>
+                    <h3 class="text-lg font-semibold text-gray-800">Présents</h3>
+                    <div class="stat-number text-2xl font-bold text-green-600" id="presentCount">0</div>
+                    <div class="stat-label text-gray-600">Aujourd'hui</div>
                 </div>
             </div>
         </div>
-        <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 border-l-4 border-red-600">
-            <div class="flex items-center gap-4">
-                <div class="bg-red-500 text-white rounded-full p-3">
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-red-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-red-500 text-white rounded-full p-3">
                     <i class="fas fa-user-times"></i>
                 </div>
                 <div>
-                    <h3 class="text-base sm:text-lg font-semibold text-gray-800">Absents</h3>
-                    <div class="text-xl sm:text-2xl font-bold text-red-600" id="absentCount">0</div>
-                    <div class="text-gray-600 text-xs sm:text-sm">Aujourd'hui</div>
+                    <h3 class="text-lg font-semibold text-gray-800">Absents</h3>
+                    <div class="stat-number text-2xl font-bold text-red-600" id="absentCount">0</div>
+                    <div class="stat-label text-gray-600">Aujourd'hui</div>
                 </div>
             </div>
         </div>
-        <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 border-l-4 border-yellow-600">
-            <div class="flex items-center gap-4">
-                <div class="bg-yellow-500 text-white rounded-full p-3">
+        <div class="card bg-white shadow-xl rounded-lg p-6 border-l-4 border-yellow-600">
+            <div class="card-header flex items-center gap-4">
+                <div class="card-icon bg-yellow-500 text-white rounded-full p-3">
                     <i class="fas fa-user-clock"></i>
                 </div>
                 <div>
-                    <h3 class="text-base sm:text-lg font-semibold text-gray-800">En Congé</h3>
-                    <div class="text-xl sm:text-2xl font-bold text-yellow-600" id="leaveCount">0</div>
-                    <div class="text-gray-600 text-xs sm:text-sm">Aujourd'hui</div>
+                    <h3 class="text-lg font-semibold text-gray-800">En Congé</h3>
+                    <div class="stat-number text-2xl font-bold text-yellow-600" id="leaveCount">0</div>
+                    <div class="stat-label text-gray-600">Aujourd'hui</div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Calendar View -->
-    <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 mb-8 border-l-4 border-blue-600">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
-            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-calendar mr-2 text-blue-600"></i> Vue Calendrier</h3>
-            <div class="flex items-center gap-2">
+    <div class="card bg-white shadow-xl rounded-lg p-6 mb-8 border-l-4 border-blue-600">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-calendar mr-2"></i> Vue Calendrier</h3>
+            <div class="flex gap-2">
                 <button id="prevMonth" class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white"><i class="fas fa-chevron-left"></i></button>
-                <span id="calendarMonth" class="text-gray-800 font-semibold min-w-[140px] text-center"></span>
+                <span id="calendarMonth" class="text-gray-800 font-semibold"></span>
                 <button id="nextMonth" class="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white"><i class="fas fa-chevron-right"></i></button>
             </div>
         </div>
         <div id="calendar" class="w-full"></div>
     </div>
 
-    <!-- Trends & Analytics Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Attendance Trends - Fixed height container -->
-        <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 border-l-4 border-blue-600">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fas fa-chart-line mr-2 text-blue-600"></i> Tendances des Absences</h3>
-            <div class="h-48"> <!-- Fixed height container -->
-                <canvas id="absenceTrendChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Leaderboard: Top Sites by Absence Today -->
-        <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 border-l-4 border-rose-600">
-            <div class="flex items-center justify-between mb-3">
-                <h3 class="text-lg font-semibold text-gray-800">
-                    <i class="fas fa-trophy mr-2 text-rose-600"></i> Sites — Plus forts taux d'absence (Aujourd'hui)
-                </h3>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="table w-full">
-                    <thead>
-                        <tr class="text-xs sm:text-sm">
-                            <th class="text-right text-blue-500">#</th>
-                            <th class="text-right text-blue-500">Site</th>
-                            <th class="text-right text-blue-500">Taux d'absence</th>
-                            <th class="text-right text-blue-500">Prés./Abs./Cong.</th>
-                        </tr>
-                    </thead>
-                    <tbody id="siteLeaderboardBody" class="text-xs sm:text-sm"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Absence Rate by Site (This Month) -->
-        <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 border-l-4 border-purple-600">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                <i class="fas fa-chart-bar mr-2 text-purple-600"></i> Taux d'absence par site (Mois)
-            </h3>
-            <div class="h-48"> <!-- Fixed height container -->
-                <canvas id="absenceBySiteChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Headcount vs Quota by Region -->
-        <div class="card bg-white shadow-xl rounded-lg p-4 sm:p-6 border-l-4 border-emerald-600">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                <i class="fas fa-balance-scale mr-2 text-emerald-600"></i> Effectifs vs Quotas (Régions)
-            </h3>
-            <div class="h-48 mb-4"> <!-- Fixed height container -->
-                <canvas id="regionHeadcountChart"></canvas>
-            </div>
-            <div class="mt-4 overflow-x-auto">
-                <table class="table w-full bg-gray-100">
-                    <thead>
-                        <tr class="text-xs sm:text-sm">
-                            <th class="text-right text-blue-500">Région</th>
-                            <th class="text-right text-blue-500">Effectif</th>
-                            <th class="text-right text-blue-500">Quota</th>
-                            <th class="text-right text-blue-500">Écart</th>
-                            <th class="text-right text-blue-500">Taux d'absence (aujourd'hui)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="regionTableBody" class="text-xs sm:text-sm"></tbody>
-                </table>
-            </div>
-        </div>
+    <!-- Attendance Trends -->
+    <div class="card bg-white shadow-xl rounded-lg p-6 mb-8 border-l-4 border-blue-600">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fas fa-chart-line mr-2"></i> Tendances des Absences</h3>
+        <canvas id="absenceTrendChart" height="100"></canvas>
     </div>
 </div>
 {% else %}
@@ -156,7 +95,7 @@
             for (let i = 0; i < cookies.length; i++) {
                 const cookie = cookies[i].trim();
                 if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring( name.length + 1 ));
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                     break;
                 }
             }
@@ -233,98 +172,6 @@
         if (modal) modal.close();
     }
 
-    // --- Chart helpers: destroy safely to avoid duplicates & growth ---
-    function destroyChartById(canvasId) {
-        try {
-            const chart = Chart.getChart(canvasId); // works with id string in v4
-            if (chart) chart.destroy();
-        } catch (e) {
-            // no-op: Chart not initialized yet
-        }
-    }
-
-    // ===== NEW RENDERERS =====
-    function renderSiteLeaderboard(siteStats = []) {
-        const body = document.getElementById('siteLeaderboardBody');
-        body.innerHTML = '';
-        if (!siteStats.length) {
-            body.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500">Aucune donnée</td></tr>`;
-            return;
-        }
-        siteStats.slice(0, 5).forEach((s, idx) => {
-            const pct = (s.absence_rate_today * 100).toFixed(1) + '%';
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${idx + 1}</td>
-                <td class="whitespace-nowrap">${s.name}</td>
-                <td class="text-right font-semibold text-rose-600">${pct}</td>
-                <td class="text-right">${s.present_today}/${s.absent_today}/${s.leave_today}</td>
-            `;
-            body.appendChild(row);
-        });
-    }
-
-    function renderAbsenceBySiteChart(siteStats = []) {
-        const top = [...siteStats].sort((a,b) => b.month_absence_rate - a.month_absence_rate).slice(0, 10);
-        const labels = top.map(s => s.name);
-        const data = top.map(s => +(s.month_absence_rate * 100).toFixed(2));
-
-        destroyChartById('absenceBySiteChart');
-        const ctx = document.getElementById('absenceBySiteChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: { labels, datasets: [{ label: "Taux d'absence (mois) %", data }] },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true, max: 100 } },
-                plugins: { legend: { display: false } }
-            }
-        });
-    }
-
-    function renderRegionHeadcountChart(regionStats = []) {
-        const labels = regionStats.map(r => r.region);
-        const headcounts = regionStats.map(r => r.headcount);
-        const quotas = regionStats.map(r => r.quota || 0);
-
-        destroyChartById('regionHeadcountChart');
-        const ctx = document.getElementById('regionHeadcountChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [
-                    { label: 'Effectif', data: headcounts },
-                    { label: 'Quota', data: quotas }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true } },
-                plugins: { legend: { position: 'bottom' } }
-            }
-        });
-
-        // Fill region table
-        const body = document.getElementById('regionTableBody');
-        body.innerHTML = '';
-        regionStats.forEach(r => {
-            const gap = r.quota_gap;
-            const cls = gap >= 0 ? 'text-emerald-600' : 'text-rose-600';
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="whitespace-nowrap">${r.region}</td>
-                <td class="text-right">${r.headcount}</td>
-                <td class="text-right">${r.quota || 0}</td>
-                <td class="text-right font-semibold ${cls}">${gap}</td>
-                <td class="text-right">${(r.absence_rate_today * 100).toFixed(1)}%</td>
-            `;
-            body.appendChild(tr);
-        });
-    }
-
     // Load dashboard data
     async function loadDashboardData(year, month) {
         try {
@@ -335,14 +182,18 @@
             });
             if (response.status === 401) {
                 showToast('Session expirée, veuillez vous reconnecter.', 'error');
+                // setTimeout(() => { window.location.href = "{% url 'login' %}"; }, 2000);
                 return;
             }
+
             if (response.status === 403) {
                 showToast('Permission refusée : vous devez être HR ou ADMIN.', 'error');
                 return;
             }
-            if (!response.ok) throw new Error(`Erreur API (${response.status})`);
 
+            if (!response.ok) {
+                throw new Error(`Erreur API (${response.status})`);
+            }
             const data = await response.json();
             document.getElementById('presentCount').textContent = data.present_count || 0;
             document.getElementById('absentCount').textContent = data.absent_count || 0;
@@ -352,25 +203,19 @@
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('dashboardGrid').classList.remove('hidden');
 
-            // Calendar & trend
+            // Initialize calendar
             initializeCalendar(data.calendar_data || [], year, month);
-            initializeTrendChart(data.trend_data || []);
 
-            // NEW: render site & region analytics
-            renderSiteLeaderboard(data.top_absent_sites || []);
-            renderAbsenceBySiteChart(data.site_stats || []);
-            renderRegionHeadcountChart(data.region_stats || []);
+            // Initialize trend chart
+            initializeTrendChart(data.trend_data || []);
         } catch (error) {
             console.error('Error loading dashboard:', error);
             showToast(`Erreur lors du chargement du tableau de bord : ${error.message}`, 'error');
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('dashboardGrid').classList.remove('hidden');
-            // Fallbacks
+            // Fallback data
             initializeCalendar([], year, month);
             initializeTrendChart([]);
-            renderSiteLeaderboard([]);
-            renderAbsenceBySiteChart([]);
-            renderRegionHeadcountChart([]);
         }
     }
 
@@ -389,7 +234,7 @@
         const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
         // Header
-        html += days.map(day => `<div class="font-semibold text-gray-800 text-xs sm:text-sm">${day}</div>`).join('');
+        html += days.map(day => `<div class="font-semibold text-gray-800">${day}</div>`).join('');
 
         // Days (blank cells before the first day)
         for (let i = 0; i < firstDay; i++) {
@@ -405,11 +250,11 @@
             };
             const color =
                 dayData.absent_rate > 0.5 ? 'bg-red-200'
-              : dayData.absent_rate > 0.2 ? 'bg-yellow-200'
-              : 'bg-green-200';
+            : dayData.absent_rate > 0.2 ? 'bg-yellow-200'
+            : 'bg-green-200';
 
             // All info is embedded in data-* attributes for JS use
-            html += `<div class="calendar-cell ${color} p-2 rounded cursor-pointer relative text-xs sm:text-sm"
+            html += `<div class="calendar-cell ${color} p-2 rounded cursor-pointer relative"
                 data-date="${dateStr}"
                 data-present="${dayData.present}"
                 data-absent="${dayData.absent}"
@@ -422,10 +267,14 @@
         html += '</div>';
         calendarEl.innerHTML = html;
 
-        // Tooltip code (scoped)
+        // Tooltip code
+        let calendarTooltip = null;
+
         function showCalendarTooltip(e) {
             const cell = e.currentTarget;
-            document.querySelectorAll('.tooltip-box').forEach(el => el.remove());
+            // Remove any existing tooltip
+            hideCalendarTooltip();
+
             const present = cell.dataset.present;
             const absent = cell.dataset.absent;
             const leave = cell.dataset.leave;
@@ -434,19 +283,19 @@
             const leaveRate = cell.dataset.leaveRate;
             const date = cell.dataset.date;
 
-            const tooltip = document.createElement('div');
-            tooltip.className = "z-50 absolute p-2 rounded shadow-lg bg-white border text-xs tooltip-box";
-            tooltip.style.left = "50%";
-            tooltip.style.top = "-2.5rem";
-            tooltip.style.transform = "translate(-50%, -100%)";
-            tooltip.style.minWidth = "135px";
-            tooltip.innerHTML = `
+            calendarTooltip = document.createElement('div');
+            calendarTooltip.className = "z-50 absolute p-2 rounded shadow-lg bg-white border text-xs tooltip-box";
+            calendarTooltip.style.left = "50%";
+            calendarTooltip.style.top = "-2.5rem";
+            calendarTooltip.style.transform = "translate(-50%, -100%)";
+            calendarTooltip.style.minWidth = "135px";
+            calendarTooltip.innerHTML = `
                 <div class="text-xs text-gray-800 font-semibold mb-1">${date}</div>
                 <div><span class="text-green-700 font-bold">Présents:</span> ${present} <span class="text-gray-500">(${presentRate}%)</span></div>
                 <div><span class="text-red-700 font-bold">Absents:</span> ${absent} <span class="text-gray-500">(${absentRate}%)</span></div>
                 <div><span class="text-yellow-700 font-bold">Congés:</span> ${leave} <span class="text-gray-500">(${leaveRate}%)</span></div>
             `;
-            cell.appendChild(tooltip);
+            cell.appendChild(calendarTooltip);
         }
         function hideCalendarTooltip() {
             document.querySelectorAll('.tooltip-box').forEach(el => el.remove());
@@ -471,36 +320,43 @@
             });
             if (!response.ok) throw new Error('Erreur lors du chargement des tendances');
             const data = await response.json();
-            initializeTrendChart(data.trend_data);
+            initializeTrendChart(data.trend_data); // This redraws the trend chart only!
         } catch (error) {
             showToast("Erreur: " + error.message);
+        }
+    }
+    
+    function hideCalendarTooltip(e) {
+        if (calendarTooltip) {
+            calendarTooltip.remove();
+            calendarTooltip = null;
         }
     }
 
     // Initialize trend chart
     function initializeTrendChart(data) {
-        destroyChartById('absenceTrendChart');
         const ctx = document.getElementById('absenceTrendChart').getContext('2d');
-        new Chart(ctx, {
+        // Destroy existing chart if any
+        if (window.absenceChart) {
+            window.absenceChart.destroy();
+        }
+        window.absenceChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: data.length ? data.map(d => d.date) : ['Aucune donnée'],
                 datasets: [{
-                    label: "Taux d'absence",
-                    data: data.length ? data.map(d => +(d.absence_rate * 100).toFixed(1)) : [0],
+                    label: 'Taux d\'absence',
+                    data: data.length ? data.map(d => (d.absence_rate * 100).toFixed(1)) : [0],
                     borderColor: '#e3342f',
                     fill: false,
                     tension: 0.1
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 scales: {
-                    y: { beginAtZero: true, max: 100, title: { display: true, text: "Taux d'absence (%)" } },
+                    y: { beginAtZero: true, max: 100, title: { display: true, text: 'Taux d\'absence (%)' } },
                     x: { title: { display: true, text: 'Date' } }
-                },
-                plugins: { legend: { display: false } }
+                }
             }
         });
     }
@@ -513,12 +369,18 @@
         loadDashboardData(currentYear, currentMonth);
         document.getElementById('prevMonth').addEventListener('click', () => {
             currentMonth--;
-            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
             loadDashboardData(currentYear, currentMonth);
         });
         document.getElementById('nextMonth').addEventListener('click', () => {
             currentMonth++;
-            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
             loadDashboardData(currentYear, currentMonth);
         });
     });

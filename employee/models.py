@@ -104,6 +104,8 @@ class Employee(models.Model):
     current_class = models.CharField(max_length=20, blank=True, help_text="e.g. 1ère classe, 2ème classe")
     echelon = models.PositiveIntegerField(null=True, blank=True, help_text="Current echelon level")
     manager = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='subordinates')
+    primary_worksite = models.ForeignKey('Worksite', null=True, blank=True,
+                                         on_delete=models.SET_NULL, related_name='employees')
 
     def clean(self):
         if self.manager and self.manager == self:
@@ -129,10 +131,57 @@ class Employee(models.Model):
     @property
     def is_manager(self):
         return self.subordinates.exists()
+    
+    @property
+    def region_obj(self):
+        return self.primary_worksite.region if self.primary_worksite else None
+
+    @property
+    def region_name(self):
+        return self.region_obj.name if self.region_obj else None
 
 
+class Region(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=10, unique=True)       # e.g., 'ABJ', 'YM', etc.
+    name = models.CharField(max_length=120, unique=True)      # e.g., 'Abidjan', 'Yamoussoukro'
+    quota = models.PositiveIntegerField(default=0)            # headcount quota target (optional)
+    active = models.BooleanField(default=True)
 
+    # (Optional) simple geo centroid for mapping; keep if you don't use PostGIS… yet
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
+    class Meta:
+        ordering = ["name"]
+        indexes = [models.Index(fields=["code"]), models.Index(fields=["name"])]
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+class Worksite(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=150)
+    department = models.ForeignKey('employee.Department', null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name='worksites')
+    address = models.CharField(max_length=255, blank=True)
+
+    # ⬇️ Replace old text field with a proper FK
+    region = models.ForeignKey(Region, null=True, blank=True,
+                               on_delete=models.SET_NULL, related_name='worksites')
+
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    allowed_radius_m = models.PositiveIntegerField(default=150)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [models.Index(fields=["code"])]
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
 
 
 
