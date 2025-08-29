@@ -33,6 +33,7 @@ django-cid==3.0
 django-cloudinary-storage==0.3.0
 django-filter==25.1
 django-oauth-toolkit==3.0.1
+django-prometheus==2.4.1
 django-redis==6.0.0
 django-tailwind==4.2.0
 djangorestframework==3.16.0
@@ -62,6 +63,7 @@ oauthlib==3.3.1
 packaging==25.0
 pandas==2.3.1
 pillow==11.3.0
+prometheus_client==0.22.1
 prompt_toolkit==3.0.51
 propcache==0.3.2
 prophet==1.1.7

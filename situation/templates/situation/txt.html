@@ -1,0 +1,364 @@
+situation/models.py:
+from django.db import models
+from django.utils import timezone
+from payroll.models import SituationType
+
+class Situation(models.Model):
+    employee = models.ForeignKey('employee.Employee', on_delete=models.CASCADE)
+    situation_type = models.ForeignKey('payroll.SituationType', on_delete=models.CASCADE)
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='actif', choices=[('actif', 'Actif'), ('terminé', 'Terminé'), ('en attente', 'En attente')])
+    document = models.ForeignKey('documents.Document', null=True, blank=True, on_delete=models.SET_NULL)
+    tranche_1_start = models.DateField(null=True, blank=True)
+    tranche_1_end = models.DateField(null=True, blank=True)
+    tranche_2_start = models.DateField(null=True, blank=True)
+    tranche_2_end = models.DateField(null=True, blank=True)
+    tranche_3_start = models.DateField(null=True, blank=True)
+    tranche_3_end = models.DateField(null=True, blank=True)
+    training_details = models.CharField(max_length=100, blank=True)
+    training_location = models.CharField(max_length=50, blank=True)
+    physical_control = models.BooleanField(null=True, blank=True)
+    resumption_date = models.DateField(null=True, blank=True)
+    detachment_duration = models.CharField(max_length=20, blank=True)
+    availability_reason = models.CharField(max_length=100, blank=True)
+    exclusion_reason = models.CharField(max_length=100, blank=True)
+    exit_type = models.CharField(max_length=50, blank=True)
+
+    def is_active(self):
+        today = timezone.now().date()
+        if self.end_date:
+            return self.start_date <= today <= self.end_date
+        return self.start_date <= today
+
+    def __str__(self):
+        return f"{self.employee} - {self.situation_type.name} ({self.start_date} to {self.end_date or 'ongoing'})"
+
+situation/serializers.py:
+from rest_framework import serializers
+from .models import Situation
+from payroll.serializers import SituationTypeSerializer
+from documents.serializers import DocumentSerializer
+from employee.serializers import EmployeeSerializer
+
+class SituationSerializer(serializers.ModelSerializer):
+    employee = EmployeeSerializer(read_only=True)
+    situation_type = SituationTypeSerializer(read_only=True)
+    document = DocumentSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(
+        queryset=Employee.objects.all(), source='employee', write_only=True
+    )
+    situation_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=SituationType.objects.all(), source='situation_type', write_only=True
+    )
+    document_id = serializers.PrimaryKeyRelatedField(
+        queryset=Document.objects.all(), source='document', write_only=True, required=False
+    )
+
+    class Meta:
+        model = Situation
+        fields = '__all__'
+
+    def validate(self, data):
+        start = data.get('start_date')
+        end = data.get('end_date')
+        if start and end and start > end:
+            raise serializers.ValidationError("End date must be after start date.")
+        return data
+
+situation/permissions.py:
+from rest_framework.permissions import BasePermission
+from django.utils.timezone import now
+
+class CanEditDeleteOwnSituation(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            today = now().date()
+            return (request.user == obj.employee.user and
+                    obj.status == 'en attente' and
+                    obj.start_date > today)
+        return True
+
+situation/urls.py:
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import SituationViewSet, current_situation_view, history_situation_view
+
+router = DefaultRouter()
+router.register(r'situations', SituationViewSet, basename='situations')
+
+urlpatterns = [
+    path('', include(router.urls)),
+    path('current/', current_situation_view, name='situation_current'),
+    path('history/', history_situation_view, name='situation_history'),
+]
+
+situation/views.py:
+from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
+from django.db.models import Q
+from django.utils import timezone
+from .models import Situation
+from .serializers import SituationSerializer
+from rest_framework.permissions import IsAuthenticated
+from employee.permissions import IsAdminOrHR, IsOwnProfile
+from .permissions import CanEditDeleteOwnSituation
+from django.shortcuts import render
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+class SituationViewSet(viewsets.ModelViewSet):
+    queryset = Situation.objects.select_related('employee', 'situation_type', 'document').all().order_by('-start_date')
+    serializer_class = SituationSerializer
+    pagination_class = StandardResultsSetPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [CanEditDeleteOwnLeave()]
+        elif self.action == 'create':
+            return [IsOwnProfile()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.role == 'MANAGER':
+            qs = qs.filter(employee__manager=user.employee)
+        elif user.role not in ['HR', 'ADMIN']:
+            qs = qs.filter(employee=user.employee)
+        active = self.request.query_params.get('active')
+        if active is not None:
+            active = active.lower() in ('true', '1', 'yes')
+            today = timezone.now().date()
+            if active:
+                qs = qs.filter(Q(end_date__gte=today) | Q(end_date__isnull=True), start_date__lte=today)
+            else:
+                qs = qs.exclude(Q(end_date__gte=today) | Q(end_date__isnull=True), start_date__lte=today)
+        return qs
+
+def current_situation_view(request):
+    situations = Situation.objects.filter(employee=request.user.employee, end_date__gte=timezone.now().date()).order_by('-start_date')
+    return render(request, 'situation/current.html', {'situations': situations})
+
+def history_situation_view(request):
+    situations = Situation.objects.filter(employee=request.user.employee, end_date__lt=timezone.now().date()).order_by('-start_date')
+    return render(request, 'situation/history.html', {'situations': situations})
+
+situation/templates/situation/current.html:
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-user-clock text-blue-600"></i> Situation Administrative Actuelle
+    </h1>
+
+    {% if situations %}
+    <table class="table w-full">
+        <thead>
+            <tr>
+                <th>Type de Situation</th>
+                <th>Date de Début</th>
+                <th>Date de Fin</th>
+                <th>Statut</th>
+                <th>Document</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for situation in situations %}
+            <tr>
+                <td>{{ situation.situation_type.name }}</td>
+                <td>{{ situation.start_date }}</td>
+                <td>{{ situation.end_date|default:"Ongoing" }}</td>
+                <td>{{ situation.status }}</td>
+                <td>
+                    {% if situation.document %}
+                    <a href="{{ situation.document.file.url }}" target="_blank">Voir Document</a>
+                    {% else %}
+                    Aucun
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'situation_update' situation.id %}" class="btn btn-primary btn-sm">Modifier</a>
+                    <a href="{% url 'situation_delete' situation.id %}" class="btn btn-error btn-sm">Supprimer</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-gray-500">Aucune situation active.</p>
+    {% endif %}
+
+    <a href="{% url 'situation_create' %}" class="btn btn-primary mt-4">Nouvelle Situation</a>
+</div>
+{% endblock %}
+
+situation/templates/situation/history.html:
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-8">
+        <i class="fas fa-history text-blue-600"></i> Historique des Situations Administratives
+    </h1>
+
+    {% if situations %}
+    <table class="table w-full">
+        <thead>
+            <tr>
+                <th>Type de Situation</th>
+                <th>Date de Début</th>
+                <th>Date de Fin</th>
+                <th>Statut</th>
+                <th>Document</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for situation in situations %}
+            <tr>
+                <td>{{ situation.situation_type.name }}</td>
+                <td>{{ situation.start_date }}</td>
+                <td>{{ situation.end_date|default:"Ongoing" }}</td>
+                <td>{{ situation.status }}</td>
+                <td>
+                    {% if situation.document %}
+                    <a href="{{ situation.document.file.url }}" target="_blank">Voir Document</a>
+                    {% else %}
+                    Aucun
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-gray-500">Aucun historique de situation.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+situation/templates/situation/create.html:
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-4">
+        <i class="fas fa-plus text-blue-600"></i> Nouvelle Situation Administrative
+    </h1>
+
+    <form method="post" class="grid grid-cols-1 gap-4 max-w-lg mx-auto">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="flex justify-end gap-2">
+            <button type="submit" class="btn bg-green-500 hover:bg-green-600 text-white">Soumettre</button>
+            <a href="{% url 'situation_current' %}" class="btn btn-ghost text-gray-600 hover:bg-gray-100">Annuler</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+situation/templates/situation/update.html:
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 slide-in">
+    <h1 class="text-2xl font-bold text-blue-600 uppercase flex items-center gap-2 mb-4">
+        <i class="fas fa-edit text-blue-600"></i> Modifier Situation Administrative
+    </h1>
+
+    <form method="post" class="grid grid-cols-1 gap-4 max-w-lg mx-auto">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="flex justify-end gap-2">
+            <button type="submit" class="btn bg-green-500 hover:bg-green-600 text-white">Mettre à jour</button>
+            <a href="{% url 'situation_current' %}" class="btn btn-ghost text-gray-600 hover:bg-gray-100">Annuler</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+situation/admin.py:
+from django.contrib import admin
+from .models import Situation
+
+admin.site.register(Situation) 
+
+situation/forms.py:
+from django import forms
+from .models import Situation
+
+class SituationForm(forms.ModelForm):
+    class Meta:
+        model = Situation
+        fields = '__all__'
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+            'tranche_1_start': forms.DateInput(attrs={'type': 'date'}),
+            'tranche_1_end': forms.DateInput(attrs={'type': 'date'}),
+            'tranche_2_start': forms.DateInput(attrs={'type': 'date'}),
+            'tranche_2_end': forms.DateInput(attrs={'type': 'date'}),
+            'tranche_3_start': forms.DateInput(attrs={'type': 'date'}),
+            'tranche_3_end': forms.DateInput(attrs={'type': 'date'}),
+            'resumption_date': forms.DateInput(attrs={'type': 'date'}),
+        } 
+
+situation/signals.py:
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .models import Situation
+from django.utils import timezone
+
+@receiver(post_save, sender=Situation)
+def update_employee_status(sender, instance, **kwargs):
+    employee = instance.employee
+    code = instance.situation_type.code.lower()
+    today = timezone.now().date()
+
+    if code in ['resignation', 'death', 'retirement', 'exit']:
+        employee.is_active = False
+        employee.save()
+    elif code == 'suspension' and instance.end_date and instance.end_date <= today:
+        employee.is_active = True
+        employee.save()
+
+situation/tasks.py:
+# situation/tasks.py
+from celery import shared_task
+from django.utils import timezone
+from .models import Situation
+from notifications.tasks import send_notification
+
+@shared_task
+def monitor_situations():
+    """Check administrative situations for important status changes or anomalies."""
+    today = timezone.localdate()
+    # 1. Upcoming resumption: situations ending in 5 days
+    upcoming = Situation.objects.filter(end_date=today + timezone.timedelta(days=5), status='actif')
+    for sit in upcoming:
+        msg = f"{sit.situation_type.name} for {sit.employee} ends on {sit.end_date}. Ensure resumption process."
+        send_notification.delay(sit.employee.contact, "SMS", msg)
+    # 2. Ended but not closed: situations where end_date passed but status still 'actif'
+    overdue = Situation.objects.filter(end_date__lt=today, status='actif')
+    for sit in overdue:
+        msg = f"Situation {sit.situation_type.name} for {sit.employee} should have ended on {sit.end_date} but is not closed."
+        send_notification.delay(None, "EMAIL", msg)  # notify HR via email
+        sit.status = 'terminé'
+        sit.save()
+    # 3. Death reported but still active: if any employee has an 'exit' situation of type death, ensure employee.status updated
+    deaths = Situation.objects.filter(situation_type__code='exit').exclude(exit_type__in=[None, '']).select_related('employee')
+    for sit in deaths:
+        if 'décès' in sit.exit_type.lower() and sit.employee.status == 'actif':
+            # Send urgent alert to HR
+            msg = f"Alert: {sit.employee} marked as deceased on {sit.start_date} but still active in system."
+            send_notification.delay(None, "WHATSAPP", msg)
+            sit.employee.status = 'inactif'
+            sit.employee.save()
+
+{% endblock %}

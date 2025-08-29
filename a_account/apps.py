@@ -14,6 +14,9 @@ class AccountConfig(AppConfig):
             if created:
                 UserSetting.objects.get_or_create(user=instance)
         post_save.connect(create_settings, sender=settings.AUTH_USER_MODEL)
+        
+        from config.monitoring.metrics import setup_metrics
+        setup_metrics()
 
 
 

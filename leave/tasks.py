@@ -6,6 +6,7 @@ from notifications.tasks import send_notification
 from authentication.models import User
 from employee.models import Employee
 from .models import *
+from config.monitoring.metrics import mark_beat_run
 
 import logging
 logger = logging.getLogger(__name__)
@@ -266,6 +267,9 @@ def notify_leave_request_submission(leave_request_id: int):
     Notify manager + HR/ADMIN when an employee submits a leave request.
     Also send a confirmation to the employee.
     """
+    # Mark task as run in monitoring
+    mark_beat_run("leave.tasks.notify_leave_request_submission")
+    
     try:
         leave = LeaveRequest.objects.select_related("employee", "leave_type", "employee__manager", "employee__user").get(id=leave_request_id)
         employee = leave.employee
@@ -317,6 +321,10 @@ def notify_leave_request_response(leave_request_id: int):
     Notify employee of the manager/HR decision.
     If manager approved, ping HR/ADMIN for the next step.
     """
+
+    # Mark task as run in monitoring
+    mark_beat_run("leave.tasks.notify_leave_request_response")
+    
     try:
         leave = LeaveRequest.objects.select_related("employee", "leave_type", "employee__user").get(id=leave_request_id)
         employee = leave.employee
@@ -357,6 +365,10 @@ def notify_leave_balance_update(employee_id: int, leave_type_id: int, year: int,
     """
     Notify employee after HR updates the balance.
     """
+
+    # Mark task as run in monitoring
+    mark_beat_run("leave.tasks.notify_leave_balance_update")
+    
     try:
         employee = Employee.objects.select_related("user").get(id=employee_id)
         lt = LeaveType.objects.get(id=leave_type_id)
@@ -372,6 +384,10 @@ def upcoming_leave_reminder():
     """
     Remind employee/manager/HR 5 days before a leave ends (still approved).
     """
+    
+    # Mark task as run in monitoring
+    mark_beat_run("leave.tasks.upcoming_leave_reminder")
+    
     try:
         today = timezone.localdate()
         in_five_days = today + timezone.timedelta(days=5)
@@ -408,6 +424,10 @@ def notify_overlapping_leave(leave_request_id: int):
     """
     Alert HR/ADMIN if a new request overlaps an existing approved leave for the same employee.
     """
+    
+    # Mark task as run in monitoring
+    mark_beat_run("leave.tasks.notify_overlapping_leave")
+    
     try:
         leave = LeaveRequest.objects.select_related("employee", "leave_type").get(id=leave_request_id)
 
@@ -435,6 +455,10 @@ def notify_delegate_leave(leave_request_id: int):
     """
     Inform delegates if a request falls within an active delegation period.
     """
+    
+    # Mark task as run in monitoring
+    mark_beat_run("leave.tasks.notify_delegate_leave")
+    
     try:
         leave = LeaveRequest.objects.select_related("employee", "leave_type").get(id=leave_request_id)
         lt = leave.leave_type.name if leave.leave_type_id else "Leave"

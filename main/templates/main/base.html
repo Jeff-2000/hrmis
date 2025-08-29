@@ -1,12 +1,42 @@
 {% load static tailwind_tags %}
+{% load absolute_uri %} {# Custom template tag to build absolute URIs #}
+
+{# Build absolute URLs for OG image and canonical URL #}
+{% static 'img/social-card.jpg' as social_rel %}
+{% absolute_uri social_rel as SOCIAL_IMG %}
+{% absolute_uri request.get_full_path as CANON_URL %}
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}HRMIS - République de Côte d'Ivoire{% endblock %}</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" rel="stylesheet">
     
+
+
+    <!-- Open Graph (used by Facebook, WhatsApp, LinkedIn, etc.) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="HRMIS - République de Côte d'Ivoire">
+    <meta property="og:title" content="{% block og_title %}HRMIS — Système de Gestion des Ressources Humaines{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Portail RH : paie, présence, congés, documents et plus.{% endblock %}">
+    <meta property="og:url" content="{{ CANON_URL }}">
+    <meta property="og:image" content="{{ SOCIAL_IMG }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:locale" content="fr_FR">
+
+    <!-- Twitter (X) -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block tw_title %}HRMIS — Système de Gestion des Ressources Humaines{% endblock %}">
+    <meta name="twitter:description" content="{% block tw_description %}Portail RH : paie, présence, congés, documents et plus.{% endblock %}">
+    <meta name="twitter:image" content="{{ SOCIAL_IMG }}">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="{{ CANON_URL }}">
+
+
     <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon.ico' %}">    
 
@@ -531,10 +561,10 @@
     <!-- Begin of Designer Info -->
     <!-- Floating button -->
     <button id="designerFab"
-    class="fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-blue-600 text-white shadow-xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
-    aria-label="À propos du concepteur" title="À propos du concepteur">
-    <i class="fa-solid fa-id-badge text-lg"></i>
-    </button>
+        class="fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-blue-600 text-white shadow-xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
+        aria-label="À propos du concepteur" title="À propos du concepteur">
+        <i class="fa-solid fa-id-badge text-lg"></i>
+    </button> 
 
     <!-- Modal -->
     <div id="designerModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
@@ -641,6 +671,205 @@
     })();
     </script>
     <!-- Done Designer Info -->
+
+    <!-- Feedback floating button -->
+    <div class="fixed bottom-5 left-5 z-50 w-12 h-12" data-tip="Donner un avis">
+    <button id="feedbackFab" type="button" class="btn btn-circle btn-success shadow-xl text-xl font-bold">
+        ?
+    </button>
+    </div>
+
+    <!-- Feedback modal (daisyUI) -->
+    <dialog id="feedbackModal" class="modal">
+    <div class="modal-box max-w-lg bg-green-50 rounded-xl shadow-2xl p-6">
+        <!-- Header -->
+        <div class="flex items-center gap-3 mb-4">
+        <i class="fa-solid fa-comment-dots text-blue-500 text-2xl"></i>
+        <h3 class="text-xl font-bold text-gray-800" id="fb-title">Votre avis</h3>
+        </div>
+
+        <!-- Star Rating (Font Awesome, no inputs) -->
+        <div class="mb-4">
+        <label class="label"><span class="label-text font-medium">Note</span></label>
+
+        <div id="fbStars"
+            class="bg-white p-6 rounded-lg flex justify-center items-center gap-3"
+            role="radiogroup" aria-label="Note">
+            <!-- Each button uses FA regular star when off, solid when on -->
+            <button type="button" class="star btn btn-ghost btn-sm p-1" data-v="1"
+                    role="radio" aria-checked="false" aria-label="1 étoile">
+            <i class="fa-regular fa-star text-3xl text-green-300"></i>
+            </button>
+            <button type="button" class="star btn btn-ghost btn-sm p-1" data-v="2"
+                    role="radio" aria-checked="false" aria-label="2 étoiles">
+            <i class="fa-regular fa-star text-3xl text-green-300"></i>
+            </button>
+            <button type="button" class="star btn btn-ghost btn-sm p-1" data-v="3"
+                    role="radio" aria-checked="false" aria-label="3 étoiles">
+            <i class="fa-regular fa-star text-3xl text-green-300"></i>
+            </button>
+            <button type="button" class="star btn btn-ghost btn-sm p-1" data-v="4"
+                    role="radio" aria-checked="false" aria-label="4 étoiles">
+            <i class="fa-regular fa-star text-3xl text-green-300"></i>
+            </button>
+            <button type="button" class="star btn btn-ghost btn-sm p-1" data-v="5"
+                    role="radio" aria-checked="false" aria-label="5 étoiles">
+            <i class="fa-regular fa-star text-3xl text-green-300"></i>
+            </button>
+        </div>
+
+        <p class="text-xs text-gray-500 mt-1">Vous pouvez évaluer sans commentaire.</p>
+        </div>
+
+
+        <!-- Comment Box -->
+        <div class="mb-2">
+        <label class="label"><span class="label-text font-medium">Commentaire (optionnel)</span></label>
+        <textarea id="fbComment" rows="4" maxlength="500"
+                    class="textarea bg-gray-100 textarea-bordered w-full resize-none focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+                    placeholder="Décrivez le problème ou votre suggestion (optionnel)"></textarea>
+        <!-- live counter gets injected just below by JS -->
+        </div>
+
+        <!-- Feedback Message -->
+        <p id="fbMsg" class="text-sm mb-2"></p>
+
+        <!-- Actions -->
+        <div class="modal-action">
+        <button type="button" id="fbCancel" class="btn btn-ghost">Annuler</button>
+        <button type="button" id="fbSubmit" class="btn btn-primary">Envoyer</button>
+        </div>
+    </div>
+
+    <!-- Backdrop -->
+    <form method="dialog" class="modal-backdrop"><button>Fermer</button></form>
+    </dialog>
+
+    <script>
+    // CSRF (session-auth)
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    const fab = document.getElementById('feedbackFab');
+    const modal = document.getElementById('feedbackModal');
+    const comment = document.getElementById('fbComment');
+    const msg = document.getElementById('fbMsg');
+    const cancel = document.getElementById('fbCancel');
+    const submit = document.getElementById('fbSubmit');
+
+    // ----- STAR WIDGET (no inputs) -----
+    const starButtons = Array.from(document.querySelectorAll('#fbStars .star'));
+    let rating = 0;
+
+    function paintStars(n) {
+        starButtons.forEach((btn, i) => {
+        const icon = btn.querySelector('i');
+        const filled = i < n;
+
+        // Toggle FA styles: regular (unselected) vs solid (selected)
+        icon.classList.toggle('fa-regular', !filled);
+        icon.classList.toggle('fa-solid', filled);
+
+        // Color: yellow when selected, gray when not
+        icon.classList.toggle('text-yellow-400', filled);
+        icon.classList.toggle('text-gray-300', !filled);
+
+        // ARIA & focus mgmt
+        btn.setAttribute('aria-checked', (i + 1) === n ? 'true' : 'false');
+        btn.tabIndex = (i + 1) === (n || 1) ? 0 : -1;
+        });
+    }
+
+    starButtons.forEach((btn, idx) => {
+        const val = idx + 1;
+        btn.addEventListener('mouseenter', () => paintStars(val));
+        btn.addEventListener('mouseleave', () => paintStars(rating || 0));
+        btn.addEventListener('click', () => { rating = val; paintStars(rating); });
+        btn.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault(); rating = val; paintStars(rating);
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault(); rating = Math.min(5, (rating || 1) + 1); paintStars(rating); starButtons[rating - 1].focus();
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault(); rating = Math.max(1, (rating || 1) - 1); paintStars(rating); starButtons[rating - 1].focus();
+        }
+        });
+    });
+        // Initialize stars blank
+        paintStars(0);
+    // -----------------------------------
+
+    function openModal(){ msg.textContent=''; msg.className='text-sm mb-2'; modal.showModal(); }
+    function closeModal(){
+        modal.close();
+        comment.value = '';
+        rating = 0;
+        paintStars(0);
+        msg.textContent = '';
+        updateCharCount(); // reset counter
+    }
+
+    fab.addEventListener('click', openModal);
+    cancel.addEventListener('click', closeModal);
+
+    // ----- COMMENT MAX LENGTH (keep this logic) -----
+    comment.maxLength = 500; // programmatic guard (HTML attribute also set)
+    const charCount = document.createElement('div');
+    charCount.id = 'charCount';
+    charCount.className = 'text-xs mt-1 text-right text-gray-500';
+    comment.parentNode.insertBefore(charCount, comment.nextSibling);
+
+    function updateCharCount() {
+        const len = comment.value.length;
+        charCount.textContent = `${len}/500`;
+        charCount.className = `text-xs mt-1 text-right ${len >= 500 ? 'text-red-500' : 'text-gray-500'}`;
+    }
+    comment.addEventListener('input', updateCharCount);
+    updateCharCount();
+    // -----------------------------------------------
+
+    submit.addEventListener('click', async () => {
+        if (!rating) {
+        msg.textContent = "Veuillez choisir une note (1–5).";
+        msg.className = "text-sm text-red-500 mb-2";
+        return;
+        }
+        if (comment.value.length > 500) {
+        msg.textContent = "Le commentaire dépasse 500 caractères.";
+        msg.className = "text-sm text-red-500 mb-2";
+        return;
+        }
+        msg.textContent = "Envoi en cours…";
+        msg.className = "text-sm text-gray-500 mb-2";
+
+        try {
+        const res = await fetch("/api/v1/feedback/submit/", {
+            method: "POST",
+            headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken || ""
+            },
+            body: JSON.stringify({
+            rating,
+            comment: comment.value || "",
+            page_url: window.location.href,
+            user_agent: navigator.userAgent
+            })
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        msg.textContent = "Merci pour votre retour !";
+        msg.className = "text-sm text-green-600 mb-2";
+        setTimeout(closeModal, 1000);
+        } catch (e) {
+        msg.textContent = "Échec de l’envoi. Réessayez.";
+        msg.className = "text-sm text-red-500 mb-2";
+        }
+    });
+    </script>
 
     {% block extra_js %}
     {% endblock %}

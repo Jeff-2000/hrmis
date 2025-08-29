@@ -92,7 +92,7 @@ class DashboardSummaryAPI(APIView):
 
         # ---------- KPI COUNTS ----------
         headcount_total = Employee.objects.count()
-        # "Active" proxy: status='actif' if you use that
+        # "Active" proxy: status='actif' if use that
         headcount_active = Employee.objects.filter(status__iexact="actif").count()
 
         contracts_expiring_30d = Contract.objects.filter(
@@ -364,4 +364,46 @@ from django.shortcuts import redirect
 # Logout view
 def logout_view(request):
     logout(request)  # ✅ removes the user from the session
-    return redirect("public_home")  # or "home", or wherever you want
+    return redirect("public_home")  # or "home", or wherever 
+
+##########################################################
+# System Info and Log Viewing (for staff users, DEBUG only)
+from django.http import JsonResponse, Http404, HttpResponse
+from django.contrib.auth.decorators import user_passes_test
+from django.conf import settings
+
+def is_staff(user):
+    return user.is_staff
+
+@user_passes_test(is_staff)
+def system_info(request):
+    if not settings.DEBUG:
+        raise Http404("Not found")
+    
+    import platform
+    import sys
+    import django
+    import celery
+
+    info = {
+        "python_version": sys.version,
+        "django_version": django.get_version(),
+        "celery_version": celery.__version__,
+        "platform": platform.platform(),
+        "processor": platform.processor(),
+        "system": platform.system(),
+        "release": platform.release(),
+        "machine": platform.machine(),
+    }
+    return JsonResponse(info)
+
+def view_log_file(request, filename):
+    file_path = settings.BASE_DIR / filename
+    if file_path.exists():
+        with open(file_path, 'r') as file:
+            response = HttpResponse(file.read(), content_type='text/plain')
+            return response
+    else:
+        raise Http404("Log file does not exist")
+
+##########################################################

@@ -6,6 +6,7 @@ from .models import Notification
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 import json
+from config.monitoring.metrics import inc_twilio, inc_whatsapp, inc_cloudinary
 
 # @csrf_exempt
 # def twilio_status_webhook(request):
@@ -78,6 +79,10 @@ def _twilio_signature_valid(request) -> bool:
 
 @csrf_exempt
 def twilio_status_webhook(request):
+    
+    # Increment metric
+    inc_twilio("status_callback")
+    
     # Twilio posts form-encoded for both SMS and WhatsApp
     if not _twilio_signature_valid(request):
         return HttpResponse(status=403)
@@ -124,6 +129,10 @@ def twilio_status_webhook(request):
 
 @csrf_exempt
 def whatsapp_cloud_webhook(request):
+    
+    # Increment metric
+    inc_whatsapp("message")
+    
     # Meta sends JSON with challenge on GET
     if request.method == "GET":
         if request.GET.get("hub.verify_token") == getattr(settings, "WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""):

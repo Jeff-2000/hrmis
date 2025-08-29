@@ -81,12 +81,12 @@ def login_view(request):
 def logout_view(request):
     logger.info(f"User {request.user.username} logged out")
     logout(request)
-    return redirect('login')
+    return redirect('home_dashboard')
 @login_required
 def logout_view(request):
     logger.info(f"User {request.user.username} logged out")
     logout(request)
-    return redirect('login')
+    return redirect('home_dashboard')
 
 def index_view(request):
     # This is a placeholder for the index view logic

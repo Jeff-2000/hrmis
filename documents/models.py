@@ -22,6 +22,15 @@ class Document(models.Model):
     status = models.CharField(max_length=20, default='valide', choices=[('to_validate', 'À valider'), ('valide', 'Valide'), ('expiré', 'Expiré')])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['document_type']),
+            models.Index(fields=['status']),
+            models.Index(fields=['issuance_date']),
+        ]
+        ordering = ['-uploaded_at']
+    
     def __str__(self):
         return f"{self.document_type} - {self.issued_by} ({self.issuance_date})"
 

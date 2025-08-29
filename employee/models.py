@@ -9,6 +9,11 @@ class Department(models.Model):
     name = models.CharField(max_length=100)
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
     # Additional fields like code, etc., can be added for hierarchy
+    
+    class Meta:
+        ordering = ['name']
+        indexes = [models.Index(fields=['name'])]
+    
     def __str__(self):
         return self.name
 
@@ -17,6 +22,11 @@ class Grade(models.Model):
     code = models.CharField(max_length=10, unique=True)  # e.g. "A1"
     description = models.CharField(max_length=100, blank=True)
     # Perhaps salary scale or level can be included
+    
+    class Meta:
+        ordering = ['code']
+        indexes = [models.Index(fields=['code'])]
+    
     def __str__(self):
         return self.code
 
@@ -139,6 +149,15 @@ class Employee(models.Model):
     @property
     def region_name(self):
         return self.region_obj.name if self.region_obj else None
+    class Meta:
+        indexes = [
+            models.Index(fields=['last_name', 'first_name']),     # fast search by name
+            models.Index(fields=['status']),                      # filter by employment status
+            models.Index(fields=['department']),                  # filter by department
+            models.Index(fields=['grade']),                       # filter by grade
+            models.Index(fields=['region']),                      # filter by region field
+            models.Index(fields=['date_joined']),                # queries by join date
+        ]
 
 
 class Region(models.Model):
@@ -158,6 +177,13 @@ class Region(models.Model):
 
     def __str__(self):
         return f"{self.code} — {self.name}"
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"]),   # fast lookup by region code
+            models.Index(fields=["name"]),   # fast lookup by region name
+            models.Index(fields=["active"]), # filter active regions quickly
+        ]
 
 class Worksite(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -182,6 +208,15 @@ class Worksite(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"]),       # fast lookup by worksite code
+            models.Index(fields=["region"]),     # queries filtering by region
+            models.Index(fields=["department"]), # queries filtering by department
+            models.Index(fields=["active"]),     # active worksites filter
+        ]
 
 
 

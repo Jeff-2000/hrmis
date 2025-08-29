@@ -10,3 +10,5 @@ class AuditConfig(AppConfig):
         from . import signals  # noqa: F401
         from . import registry  # noqa: F401
 
+        from config.monitoring.metrics import setup_metrics
+        setup_metrics()

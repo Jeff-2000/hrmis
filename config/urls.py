@@ -36,6 +36,8 @@ urlpatterns = [
     path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
     # path("api/v1/integrations/", include(("integrations.urls", "integrations"), namespace="integrations")),
     path("api/v1/integrations/", include(("integrations.urls", "integrations"), namespace="integrations")),
+    path("prometheus/", include("django_prometheus.urls")),  # Prometheus metrics endpoint
+    
 ]
 
 
@@ -113,7 +115,7 @@ urlpatterns += [
     path("", RedirectView.as_view(url="/swagger/", permanent=False)),
 ]
 
-# Static/media (dev only)
+# # Static/media (dev only)
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=getattr(settings, "STATIC_ROOT", None))
     urlpatterns += static(settings.MEDIA_URL, document_root=getattr(settings, "MEDIA_ROOT", None))

@@ -3,6 +3,7 @@ from celery import shared_task
 from django.utils import timezone
 from .models import Situation
 from notifications.tasks import send_notification
+from config.monitoring.metrics import mark_beat_run
 
 # @shared_task
 # def monitor_situations():
@@ -66,6 +67,10 @@ def monitor_situations():
     3) Exit by death (situation_type.code == 'exit' and exit_type indicates 'décès'):
        - Alert HR/ADMIN if employee remains active, then deactivate employee.
     """
+    
+    # Mark task as run in monitoring
+    mark_beat_run("situation.tasks.monitor_situations")
+    
     try:
         today = timezone.localdate()
         in_five_days = today + timezone.timedelta(days=5)

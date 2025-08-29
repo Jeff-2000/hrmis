@@ -17,6 +17,11 @@ class AttendanceRecord(models.Model):
 
     class Meta:
         unique_together = ('employee', 'date')  # one record per employee per date
+        indexes = [
+            models.Index(fields=['employee']),       # index for queries filtering by employee
+            models.Index(fields=['date']),           # index for queries filtering by date
+            models.Index(fields=['status']),         # optional: if you often filter by status
+        ]
 
     def __str__(self):
         return f"{self.employee} - {self.date} : {self.status}"

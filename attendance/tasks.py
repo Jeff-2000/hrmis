@@ -4,6 +4,7 @@ from django.utils import timezone
 from .models import AttendanceRecord
 from employee.models import Employee
 from notifications.tasks import send_notification
+from config.monitoring.metrics import mark_beat_run
 
 # @shared_task
 # def daily_attendance_reconciliation():
@@ -88,6 +89,10 @@ def _notify(user, *, title: str, message: str, priority: int = 3, attendance: At
 @shared_task
 def daily_attendance_reconciliation():
     """Mark employees absent if they have no attendance record for today, and send alerts for prolonged absences."""
+    
+    # Mark task as run in monitoring
+    mark_beat_run("attendance.tasks.daily_attendance_reconciliation")
+    
     try:
         today = timezone.localdate()
         # Identify employees without a record today

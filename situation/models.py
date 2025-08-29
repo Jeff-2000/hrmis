@@ -40,3 +40,12 @@ class Situation(models.Model):
     
     class Meta:
         ordering = ['-start_date']
+        indexes = [
+            models.Index(fields=['employee']),           # fast lookup by employee
+            models.Index(fields=['situation_type']),    # fast lookup by situation type
+            models.Index(fields=['status']),            # filter by status quickly
+            models.Index(fields=['start_date']),        # filter by start date
+            models.Index(fields=['end_date']),          # filter by end date
+            models.Index(fields=['resumption_date']),   # queries by resumption date
+        ]
+        

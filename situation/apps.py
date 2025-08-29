@@ -8,3 +8,6 @@ class SituationConfig(AppConfig):
     def ready(self):
         import situation.signals
         # Ensure signals are imported when the app is ready
+
+        from config.monitoring.metrics import setup_metrics
+        setup_metrics()

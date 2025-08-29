@@ -31,7 +31,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = True if ENVIRONMENT == 'development' else False
 
 ALLOWED_HOSTS = []
 
@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'cloudinary_storage',
     'cloudinary',
+    "django_prometheus",
 ]
 
 INSTALLED_APPS += [
@@ -64,6 +65,7 @@ INSTALLED_APPS += [
     'analytics',
     'a_account',
     'integrations',
+    'auditlog',
 ]
 
 INSTALLED_APPS += [
@@ -81,7 +83,6 @@ if DEBUG:
     INSTALLED_APPS += [
         'django_browser_reload',
         # 'rest_framework.authtoken',
-        'auditlog',  # for audit logging
     ]
 
 TAILWIND_APP_NAME = 'theme'
@@ -148,6 +149,8 @@ else:
     }
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
+
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware', 
@@ -157,6 +160,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'auditlog.middleware.AuditlogMiddleware', # Middleware for audit logging
+    
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 if DEBUG:
@@ -191,17 +196,21 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
+        # 'ENGINE': 'django.db.backends.sqlite3',
+        "ENGINE": "django_prometheus.db.backends.sqlite3",
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
-POSTGRESS_LOCALLY = False
+POSTGRESS_LOCALLY = True
+# Use PostgreSQL in production or if POSTGRESS_LOCALLY is False
 
 if ENVIRONMENT == 'production' or not POSTGRESS_LOCALLY:
     DATABASES['default'] = dj_database_url.config(
         default=config('RENDER_EXTERNAL_DATABASE_URL')
     )
+    DATABASES["default"]["ENGINE"] = "django_prometheus.db.backends.postgresql"
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -331,10 +340,10 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 
-# If you use Redis:
+# If using Redis:
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
+        "BACKEND": "django_prometheus.cache.backends.redis.RedisCache", 
         "LOCATION": "redis://127.0.0.1:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
@@ -427,3 +436,7 @@ SWAGGER_SETTINGS = {
     "SHOW_REQUEST_DURATION": True,
     "VALIDATOR_URL": None,       # offline validation
 }
+
+ADMINS = [
+    ('Jeff', 'jeffpierre720@gmail.com')
+]

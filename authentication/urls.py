@@ -1,11 +1,11 @@
 from django.urls import path
-from . import views  # or the correct module if your views are elsewhere
+from . import views  # or the correct module if views are elsewhere
 from django.contrib.auth.views import LoginView, LogoutView
 
 
 from django.views.generic import TemplateView # For static templates like dashboard
 
-# Import your authentication views if custom, or use Django's built-in
+# Import authentication views if custom, or use Django's built-in
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
@@ -55,4 +55,11 @@ from .views import login_view, logout_view
 urlpatterns += [
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
+]
+
+
+from .feedback_views import SubmitFeedbackView
+
+urlpatterns += [
+    path("api/v1/feedback/submit/", SubmitFeedbackView.as_view(), name="feedback-submit"),
 ]

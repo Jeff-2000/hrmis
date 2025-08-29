@@ -10,6 +10,7 @@ from employee.models import Employee
 from authentication.models import User
 from payroll.models import Contract
 from notifications.tasks import send_notification
+from config.monitoring.metrics import mark_beat_run
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,10 @@ CONTRACT_CATEGORY = "contract"
 @shared_task
 def check_document_expiry():
     """Mark documents as expired if their validity period has passed and notify relevant users."""
+    
+    # Mark task as run in monitoring
+    mark_beat_run("documents.tasks.check_document_expiry")
+    
     today = timezone.localdate()
     expiring_docs = Document.objects.filter(status='valide', issuance_date__isnull=False)
     for doc in expiring_docs:
@@ -77,6 +82,10 @@ def _notify(user, *, title: str, message: str, priority: int = 3, contract: Cont
 @shared_task
 def check_contract_expiry():
     """Mark contracts as expired if their end_date has passed and notify the employee's manager and ADMIN users."""
+    
+    # Mark task as run in monitoring
+    mark_beat_run("documents.tasks.check_contract_expiry")
+    
     try:
         today = timezone.localdate()
         # Find active contracts with an end_date before today
@@ -142,6 +151,10 @@ def check_contract_expiry():
 @shared_task
 def check_ContractOrLeaveRequest_document_expiry():
     """Mark documents linked to Contract or LeaveRequest as expired if their end_date has passed."""
+    
+    # Mark task as run in monitoring
+    mark_beat_run("documents.tasks.check_ContractOrLeaveRequest_document_expiry")
+    
     try:
         today = timezone.localdate()
         # Get ContentType for Contract and LeaveRequest

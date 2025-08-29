@@ -7,6 +7,8 @@ import logging
 from payroll.models import PayrollRun, Payslip
 from notifications.tasks import send_notification  # <- your Celery task
 
+from config.monitoring.metrics import mark_beat_run
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,6 +53,10 @@ def _my_payslips_url() -> str:
 @shared_task
 def notify_run_generated(run_id: int, actor_id: int, count: int) -> bool:
     """Message to the user who clicked 'Generate'."""
+    
+    # Mark task as run in monitoring
+    mark_beat_run("payroll.tasks.notify_run_generated")
+    
     try:
         run = PayrollRun.objects.select_related("company_policy").get(id=run_id)
         period = f"{str(run.month).zfill(2)}/{run.year}"
@@ -68,6 +74,10 @@ def notify_run_generated(run_id: int, actor_id: int, count: int) -> bool:
 @shared_task
 def notify_employees_payslips_ready(run_id: int) -> dict:
     """Notify each employee that their payslip is available (after Generate)."""
+    
+    # Mark task as run in monitoring
+    mark_beat_run("payroll.tasks.notify_employees_payslips_ready")
+    
     run = PayrollRun.objects.get(id=run_id)
     slips = run.payslips.select_related("employee__user", "currency").all()
 
@@ -99,6 +109,10 @@ def notify_run_closed(run_id: int, actor_id: int) -> bool:
     """
     Message to actor + notify all employees that payment has been validated (on Close).
     """
+    
+    # Mark task as run in monitoring
+    mark_beat_run("payroll.tasks.notify_run_closed")
+    
     try:
         run = PayrollRun.objects.select_related("company_policy").get(id=run_id)
         period = f"{str(run.month).zfill(2)}/{run.year}"
@@ -132,6 +146,10 @@ def notify_run_closed(run_id: int, actor_id: int) -> bool:
 @shared_task
 def notify_run_reopened(run_id: int, actor_id: int) -> bool:
     """Message to the user who clicked 'Reopen'."""
+    
+    # Mark task as run in monitoring
+    mark_beat_run("payroll.tasks.notify_run_reopened")
+    
     try:
         run = PayrollRun.objects.select_related("company_policy").get(id=run_id)
         period = f"{str(run.month).zfill(2)}/{run.year}"
